@@ -1,0 +1,15 @@
+[mapper]
+feature_space = "normalized"
+n_cubes = 8
+perc_overlap = 0.4
+min_intersection = 1
+remove_duplicate_nodes = true
+n_jobs = 1
+
+[dbscan]
+metric = "euclidean"
+min_samples = 3
+eps = "auto"
+eps_sample_size = 5000
+eps_fallback_quantile = 0.9
+random_seed = 42

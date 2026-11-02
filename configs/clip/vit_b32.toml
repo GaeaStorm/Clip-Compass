@@ -1,0 +1,12 @@
+[clip]
+provider = "huggingface-transformers"
+model_id = "openai/clip-vit-base-patch32"
+revision = "3d74acf9a28c67741b2f4f2ea7635f0aaf6f0268"
+device = "auto"
+batch_size = 16
+
+[cache]
+root = "artifacts/cache/clip"
+
+[output]
+root = "artifacts/embeddings"
