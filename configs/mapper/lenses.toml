@@ -1,0 +1,17 @@
+[lens.l2_raw]
+scale = true
+
+[lens.pca1_normalized]
+scale = true
+
+[lens.eccentricity_normalized]
+scale = true
+block_size = 1024
+
+[lens.centroid_distance_normalized]
+scale = true
+
+[lens.density_normalized]
+scale = true
+neighbors = 5
+block_size = 1024

@@ -1,0 +1,9 @@
+[dataset]
+name = "coco_localized_narratives"
+split = "val"
+limit = 25
+data_root = "data"
+
+[sources]
+localized_narratives = "https://storage.googleapis.com/localized-narratives/annotations/coco_val_captions.jsonl"
+coco_images = "http://images.cocodataset.org/val2017"

@@ -205,6 +205,12 @@ cython_debug/
 # Temporary file for partial code execution
 tempCodeRunnerFile.py
 
+# Clip Compass datasets and generated artifacts
+data/
+artifacts/
+tmp/
+*.part
+
 # Ruff stuff:
 .ruff_cache/
 
