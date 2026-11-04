@@ -19,3 +19,16 @@ class ClipEncoder(Protocol):
         """Return unnormalized projected CLIP vectors for the given images."""
 
         ...
+
+
+class ClipTextEncoder(Protocol):
+    """Minimal interface needed by cache-aware CLIP text embedding."""
+
+    @property
+    def text_spec(self) -> ClipModelSpec:
+        ...
+
+    def encode_texts(self, texts: Sequence[str]) -> np.ndarray:
+        """Return unnormalized projected CLIP vectors for the given texts."""
+
+        ...

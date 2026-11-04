@@ -54,7 +54,7 @@ Install the model runtime into a local virtual environment:
 ```bash
 python3 -m venv .venv
 .venv/bin/python -m pip install --upgrade pip setuptools wheel
-.venv/bin/python -m pip install -e '.[clip,mapper]'
+.venv/bin/python -m pip install -e '.[agent,clip,coco,mapper]'
 ```
 
 Embed every image in a prepared manifest:
@@ -71,6 +71,49 @@ revision `3d74acf9a28c67741b2f4f2ea7635f0aaf6f0268`. The resulting artifact stor
 both raw projection-layer features and unit-normalized features. Individual raw
 vectors are cached by the SHA-256 digest of the image bytes and a model/preprocessor
 fingerprint. Changing either the input or model configuration produces a cache miss.
+
+### CLIP text embeddings and similarity
+
+Text hypotheses use the pinned CLIP model's text projection and a separate
+tokenizer fingerprint, while compatibility checks ensure image and text features
+come from the same provider, model revision, and embedding dimension.
+
+```bash
+.venv/bin/clip-compass embeddings encode-texts \
+  --text "a photo of a person" \
+  --text "a photo of food on a plate" \
+  --model-cache-dir artifacts/models/huggingface
+
+.venv/bin/clip-compass embeddings image-text-similarity \
+  --images artifacts/embeddings/coco_val_first_25-clip-vit-b32.npz \
+  --texts artifacts/text-embeddings/inline-texts-34a0934385bb8616310e.npz
+```
+
+`encode-texts` also accepts `--texts-file`. Each non-empty line can be plain text
+or a JSON object with `id` and `text` fields. Text artifacts retain the original
+strings, raw and normalized projections, exact-input hashes, cache status, and
+model metadata. Similarity artifacts store the complete image-by-text cosine
+matrix together with aligned IDs and text values.
+
+## COCO instance annotations
+
+Prepare the official COCO categories, bounding boxes, polygons, and compressed
+RLE segmentations for the images already selected by the Localized Narratives
+manifest:
+
+```bash
+.venv/bin/clip-compass data prepare-coco-instances \
+  --manifest data/processed/coco_localized_narratives/coco_val_first_25.jsonl \
+  --data-root data \
+  --split val
+```
+
+The command downloads and extracts the official 2017 annotation archive only
+when needed, then writes a compact, manifest-aligned artifact under
+`data/processed/coco_instances/`. It records source and manifest hashes, preserves
+manifest image order, and validates all image/category references. The
+`instance_mask` API decodes both polygon and RLE segmentations through the COCO
+reference implementation into boolean arrays at the source image dimensions.
 
 ## Mapper lenses
 
@@ -151,3 +194,49 @@ The report is self-contained: thumbnails and graph data are embedded in the HTML
 so it can be opened without a server or network connection. Generation refuses
 misaligned graph, embedding, model-fingerprint, or manifest inputs rather than
 silently pairing the wrong images with nodes.
+
+## Explanation agent
+
+Prepare deterministic evidence before making any model request:
+
+```bash
+.venv/bin/clip-compass explanations prepare-context \
+  --graph artifacts/mapper/coco_val_first_25-pca1_normalized-mapper.json \
+  --embeddings artifacts/embeddings/coco_val_first_25-clip-vit-b32.npz \
+  --annotations data/processed/coco_instances/coco_val_first_25-instances.json \
+  --manifest data/processed/coco_localized_narratives/coco_val_first_25.jsonl \
+  --data-root data \
+  --node-id node-0000 \
+  --output artifacts/explanation-contexts/node-0000-context.json
+```
+
+The context contains centroid-nearest target images, hard contrasts chosen from
+adjacent Mapper nodes before global fallbacks, captions, COCO labels, category
+frequencies, and source hashes. Inspect this file before using the API.
+
+After setting `OPENAI_API_KEY` in the shell environment, generate structured
+hypotheses for the selected node:
+
+```bash
+.venv/bin/clip-compass explanations generate \
+  --context artifacts/explanation-contexts/node-0000-context.json \
+  --model gpt-6-astra \
+  --max-hypotheses 3 \
+  --output artifacts/explanations/node-0000.json
+```
+
+The agent sends the selected target and contrast images at low detail, requests
+strict structured output, checks all cited item IDs and COCO categories against
+the supplied evidence, and sets API storage to false. It produces candidate
+hypotheses, not verified conclusions.
+
+Export the positive and negative CLIP prompts for the next scoring stage:
+
+```bash
+.venv/bin/clip-compass explanations export-prompts \
+  --explanations artifacts/explanations/node-0000.json \
+  --output artifacts/explanations/node-0000-prompts.jsonl
+```
+
+See [the manual pipeline test](docs/manual-pipeline-test.md) for a one-node smoke
+test, CLIP discrimination check, and complete rebuild sequence.

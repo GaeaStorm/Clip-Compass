@@ -49,9 +49,20 @@ class EmbeddingBatch:
     cache_hits: np.ndarray
     model_spec: ClipModelSpec
     input_sha256: Tuple[str, ...]
+    modality: str = "image"
+    input_texts: Tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
         count = len(self.item_ids)
+        if self.modality not in {"image", "text"}:
+            raise ValueError("embedding modality must be 'image' or 'text'")
+        if self.modality == "text":
+            if len(self.input_texts) != count or any(
+                not value.strip() for value in self.input_texts
+            ):
+                raise ValueError("text embeddings must retain one non-empty input per item")
+        elif self.input_texts:
+            raise ValueError("image embeddings must not contain text inputs")
         if self.raw.ndim != 2 or self.raw.shape[0] != count:
             raise ValueError("raw embeddings must have shape (item_count, embedding_dim)")
         if self.normalized.shape != self.raw.shape:
@@ -80,6 +91,7 @@ class EmbeddingBatch:
             "embedding_dim": self.embedding_dim,
             "raw_dtype": str(self.raw.dtype),
             "cache_hit_count": int(self.cache_hits.sum()),
+            "modality": self.modality,
         }
 
     def save(self, path: Path) -> Path:
@@ -95,6 +107,7 @@ class EmbeddingBatch:
                 normalized=np.asarray(self.normalized, dtype=np.float32),
                 cache_hits=np.asarray(self.cache_hits, dtype=np.bool_),
                 input_sha256=np.asarray(self.input_sha256, dtype=np.str_),
+                input_texts=np.asarray(self.input_texts, dtype=np.str_),
                 metadata_json=np.asarray(
                     json.dumps(self.metadata(), sort_keys=True), dtype=np.str_
                 ),
@@ -121,5 +134,11 @@ class EmbeddingBatch:
                 model_spec=model_spec,
                 input_sha256=tuple(
                     str(value) for value in artifact["input_sha256"].tolist()
+                ),
+                modality=str(metadata.get("modality", "image")),
+                input_texts=(
+                    tuple(str(value) for value in artifact["input_texts"].tolist())
+                    if "input_texts" in artifact.files
+                    else ()
                 ),
             )
