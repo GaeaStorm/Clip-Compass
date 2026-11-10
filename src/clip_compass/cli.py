@@ -29,6 +29,8 @@ from clip_compass.mapper.builder import MapperConfig, build_mapper_graph
 from clip_compass.mapper.diagnostics import write_mapper_diagnostic_report
 from clip_compass.mapper.graph import MapperGraphArtifact
 from clip_compass.mapper.lenses import LENS_NAMES, LensResult, compute_lens
+from clip_compass.perturbations.masking import FILL_MODES, MaskingPerturbationEngine
+from clip_compass.perturbations.service import generate_perturbations
 
 
 def _manifest_images(
@@ -226,6 +228,48 @@ def _parser() -> argparse.ArgumentParser:
     )
     prompts.add_argument("--explanations", type=Path, required=True)
     prompts.add_argument("--output", type=Path, required=True)
+
+    perturbations = commands.add_parser(
+        "perturbations",
+        help="Generate targeted visual masks and matched random controls",
+    )
+    perturbation_commands = perturbations.add_subparsers(
+        dest="perturbation_command", required=True
+    )
+    perturbation_generate = perturbation_commands.add_parser(
+        "generate",
+        help="Build paired COCO-category and random-control perturbations",
+    )
+    perturbation_generate.add_argument("--graph", type=Path, required=True)
+    perturbation_generate.add_argument("--explanations", type=Path, required=True)
+    perturbation_generate.add_argument("--annotations", type=Path, required=True)
+    perturbation_generate.add_argument("--manifest", type=Path, required=True)
+    perturbation_generate.add_argument("--data-root", type=Path, default=Path("data"))
+    perturbation_generate.add_argument(
+        "--artifacts-root", type=Path, default=Path("artifacts")
+    )
+    perturbation_generate.add_argument("--output-dir", type=Path)
+    perturbation_generate.add_argument(
+        "--scope", choices=("all-members", "supporting"), default="all-members"
+    )
+    perturbation_generate.add_argument(
+        "--fill-mode", choices=FILL_MODES, default="gray"
+    )
+    perturbation_generate.add_argument(
+        "--fill-color",
+        type=int,
+        nargs=3,
+        metavar=("R", "G", "B"),
+        default=(127, 127, 127),
+    )
+    perturbation_generate.add_argument("--blur-radius", type=float, default=12.0)
+    perturbation_generate.add_argument("--max-control-attempts", type=int, default=256)
+    perturbation_generate.add_argument("--seed", type=int, default=42)
+    perturbation_generate.add_argument("--node-id", action="append", dest="node_ids")
+    perturbation_generate.add_argument(
+        "--hypothesis-index", action="append", type=int, dest="hypothesis_indices"
+    )
+    perturbation_generate.add_argument("--max-items-per-hypothesis", type=int)
 
     lenses = commands.add_parser("lens", help="Compute Mapper lens values")
     lens_commands = lenses.add_subparsers(dest="lens_command", required=True)
@@ -458,6 +502,50 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         summary = {
             "explanation_nodes": len(artifact.explanations),
             "output": str(args.output.resolve()),
+        }
+        print(json.dumps(summary, indent=2, sort_keys=True))
+        return 0
+    if (
+        args.command == "perturbations"
+        and args.perturbation_command == "generate"
+    ):
+        graph = MapperGraphArtifact.load(args.graph)
+        explanations = ExplanationArtifact.load(args.explanations)
+        annotations = CocoInstanceSubset.load(args.annotations)
+        engine = MaskingPerturbationEngine(
+            fill_mode=args.fill_mode,
+            fill_rgb=tuple(args.fill_color),
+            blur_radius=args.blur_radius,
+            max_control_attempts=args.max_control_attempts,
+        )
+        artifacts = ArtifactPaths.from_root(args.artifacts_root)
+        output_dir = args.output_dir or (
+            artifacts.perturbations / args.explanations.stem
+        )
+        artifact, paths = generate_perturbations(
+            graph,
+            explanations,
+            annotations,
+            engine,
+            graph_path=args.graph,
+            explanations_path=args.explanations,
+            annotations_path=args.annotations,
+            manifest_path=args.manifest,
+            data_root=args.data_root,
+            output_dir=output_dir,
+            scope=args.scope,
+            seed=args.seed,
+            node_ids=args.node_ids,
+            hypothesis_indices=args.hypothesis_indices,
+            max_items_per_hypothesis=args.max_items_per_hypothesis,
+        )
+        summary = {
+            "pair_count": len(artifact.pairs),
+            "generated_image_count": 2 * len(artifact.pairs),
+            "skipped_item_count": len(artifact.skipped),
+            "artifact": str(paths["artifact"]),
+            "embedding_manifest": str(paths["embedding_manifest"]),
+            "run_root": str(paths["run_root"]),
         }
         print(json.dumps(summary, indent=2, sort_keys=True))
         return 0

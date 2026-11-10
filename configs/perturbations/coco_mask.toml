@@ -1,0 +1,13 @@
+[engine]
+name = "coco_mask_pair"
+fill_mode = "gray"
+fill_rgb = [127, 127, 127]
+blur_radius = 12.0
+
+[control]
+strategy = "shape_preserving_random_translation_min_overlap"
+seed = 42
+max_attempts = 256
+
+[selection]
+scope = "all-members"

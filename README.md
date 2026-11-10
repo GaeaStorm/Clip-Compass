@@ -238,5 +238,45 @@ Export the positive and negative CLIP prompts for the next scoring stage:
   --output artifacts/explanations/node-0000-prompts.jsonl
 ```
 
+## Visual perturbations
+
+Generate paired visual interventions for each explanation hypothesis. The targeted
+variant masks every COCO instance in a node member that matches the hypothesis's
+`coco_categories`. Its control uses the identical mask shape and pixel count,
+translated to a seeded random location chosen to minimize overlap with the target.
+
+```bash
+.venv/bin/clip-compass perturbations generate \
+  --graph artifacts/mapper/coco_val_first_25-pca1_normalized-mapper.json \
+  --explanations artifacts/explanations/node-0000.json \
+  --annotations data/processed/coco_instances/coco_val_first_25-instances.json \
+  --manifest data/processed/coco_localized_narratives/coco_val_first_25.jsonl \
+  --data-root data \
+  --fill-mode gray \
+  --seed 42 \
+  --max-items-per-hypothesis 3
+```
+
+The run directory contains lossless PNG perturbations, binary target/control masks,
+`perturbations.json` with source hashes and annotation IDs, and an
+`embedding-manifest.jsonl`. By default, the engine tests every matching image in the
+Mapper node; use `--scope supporting` for a smaller smoke test. Available fills are
+`gray`, `mean`, and `blur`.
+
+Embed the generated target/control images through the same pinned CLIP model and
+cache used for the originals:
+
+```bash
+.venv/bin/clip-compass embeddings encode-images \
+  --manifest artifacts/perturbations/node-0000/embedding-manifest.jsonl \
+  --data-root artifacts/perturbations/node-0000 \
+  --model-cache-dir artifacts/models/huggingface \
+  --output artifacts/embeddings/node-0000-perturbations-clip-vit-b32.npz
+```
+
+The perturbation artifact keeps the mapping from each generated embedding ID back
+to its original image, node, hypothesis, COCO categories, and paired control. That
+alignment is the input contract for the next verification/scoring stage.
+
 See [the manual pipeline test](docs/manual-pipeline-test.md) for a one-node smoke
 test, CLIP discrimination check, and complete rebuild sequence.

@@ -11,7 +11,7 @@ LOKY_MAX_CPU_COUNT=8 .venv/bin/python -m unittest discover -s tests -v
 .venv/bin/python -m pip check
 ```
 
-The suite should report 25 passing tests. `LOKY_MAX_CPU_COUNT` only prevents a
+The suite should report 28 passing tests. `LOKY_MAX_CPU_COUNT` only prevents a
 macOS/joblib CPU-detection warning in restricted environments.
 
 ## 2. Inspect the Mapper report
@@ -132,7 +132,42 @@ PY
 A useful positive hypothesis should generally have a positive inside-minus-outside
 margin. This smoke check is descriptive, not the final statistical evaluation.
 
-## 6. Rebuild the complete local pipeline
+## 6. Generate and embed visual perturbations
+
+Start with the explanation's cited supporting images, then expand to all matching
+node members after inspecting the result:
+
+```bash
+.venv/bin/clip-compass perturbations generate \
+  --graph artifacts/mapper/coco_val_first_25-pca1_normalized-mapper.json \
+  --explanations artifacts/explanations/node-0000.json \
+  --annotations data/processed/coco_instances/coco_val_first_25-instances.json \
+  --manifest data/processed/coco_localized_narratives/coco_val_first_25.jsonl \
+  --data-root data \
+  --scope supporting \
+  --seed 42 \
+  --output-dir artifacts/perturbations/node-0000
+
+.venv/bin/clip-compass embeddings encode-images \
+  --manifest artifacts/perturbations/node-0000/embedding-manifest.jsonl \
+  --data-root artifacts/perturbations/node-0000 \
+  --model-cache-dir artifacts/models/huggingface \
+  --output artifacts/embeddings/node-0000-perturbations.npz
+```
+
+For every pair in `artifacts/perturbations/node-0000/perturbations.json`, inspect
+the four referenced PNGs. Confirm that the target mask covers the claimed COCO
+object, the control mask has the same `mask_pixel_count`, and both generated images
+use the same configured fill operation. The `control_overlap_fraction` should normally be zero; a
+nonzero value means no sampled translation completely avoided the target region.
+
+Rerunning with the same seed should preserve all image hashes. Remove
+`--scope supporting` or pass `--scope all-members` to perturb every node member
+that has at least one requested COCO category. The resulting embedding artifact is
+ready for the verification/scoring stage; it does not itself establish that the
+hypothesis is correct.
+
+## 7. Rebuild the complete local pipeline
 
 Use explicit output paths so subsequent commands are copy-pasteable:
 
@@ -169,6 +204,6 @@ Use explicit output paths so subsequent commands are copy-pasteable:
   --output artifacts/diagnostics/manual-coco25.html
 ```
 
-Then repeat steps 3-5 using `manual-coco25.json` and
+Then repeat steps 3-6 using `manual-coco25.json` and
 `manual-coco25.npz`. Exact topology can change if Mapper parameters change; a
 different node count is not automatically a failure.

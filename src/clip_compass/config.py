@@ -70,6 +70,10 @@ class ArtifactPaths:
         return self.root / "explanations"
 
     @property
+    def perturbations(self) -> Path:
+        return self.root / "perturbations"
+
+    @property
     def lenses(self) -> Path:
         return self.root / "lenses"
 
