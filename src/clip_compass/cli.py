@@ -6,11 +6,25 @@ from pathlib import Path
 from typing import List, Optional, Sequence, Tuple
 
 from clip_compass.config import ArtifactPaths
+from clip_compass.data.coco_instances import (
+    CocoInstanceSubset,
+    prepare_coco_instance_subset,
+)
 from clip_compass.data.localized_narratives import prepare_coco_subset
 from clip_compass.embeddings.cache import EmbeddingCache
 from clip_compass.embeddings.huggingface import HuggingFaceClipEncoder
-from clip_compass.embeddings.service import embed_images
+from clip_compass.embeddings.service import embed_images, embed_texts
+from clip_compass.embeddings.similarity import image_text_similarity
 from clip_compass.embeddings.types import EmbeddingBatch
+from clip_compass.explanations.context import build_explanation_contexts
+from clip_compass.explanations.service import (
+    generate_explanations,
+    write_hypothesis_prompts,
+)
+from clip_compass.explanations.types import (
+    ExplanationArtifact,
+    ExplanationContextBundle,
+)
 from clip_compass.mapper.builder import MapperConfig, build_mapper_graph
 from clip_compass.mapper.diagnostics import write_mapper_diagnostic_report
 from clip_compass.mapper.graph import MapperGraphArtifact
@@ -47,6 +61,46 @@ def _manifest_images(
     return item_ids, image_paths
 
 
+def _text_inputs(
+    inline_texts: Optional[Sequence[str]], texts_file: Optional[Path]
+) -> Tuple[List[str], List[str]]:
+    if inline_texts:
+        values = [value.strip() for value in inline_texts]
+        if any(not value for value in values):
+            raise ValueError("--text values must not be empty")
+        return [f"text-{index:04d}" for index in range(len(values))], values
+    if texts_file is None:
+        raise ValueError("provide at least one --text or a --texts-file")
+    ids: List[str] = []
+    values: List[str] = []
+    with texts_file.open("r", encoding="utf-8") as source:
+        for line_number, line in enumerate(source, start=1):
+            if not line.strip():
+                continue
+            stripped = line.strip()
+            if stripped.startswith("{"):
+                try:
+                    row = json.loads(stripped)
+                    item_id = str(row["id"])
+                    value = str(row["text"]).strip()
+                except (json.JSONDecodeError, KeyError, TypeError) as error:
+                    raise ValueError(
+                        f"Invalid text JSONL row at {texts_file}:{line_number}"
+                    ) from error
+            else:
+                item_id = f"text-{len(values):04d}"
+                value = stripped
+            if not item_id or not value:
+                raise ValueError(f"Empty text input at {texts_file}:{line_number}")
+            ids.append(item_id)
+            values.append(value)
+    if not values:
+        raise ValueError(f"No text inputs found in {texts_file}")
+    if len(set(ids)) != len(ids):
+        raise ValueError("text input IDs must be unique")
+    return ids, values
+
+
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="clip-compass")
     commands = parser.add_subparsers(dest="command", required=True)
@@ -67,6 +121,20 @@ def _parser() -> argparse.ArgumentParser:
     )
     subset.add_argument("--force", action="store_true", help="Redownload existing files")
 
+    instances = data_commands.add_parser(
+        "prepare-coco-instances",
+        help="Align official COCO instance annotations to a prepared manifest",
+    )
+    instances.add_argument("--manifest", type=Path, required=True)
+    instances.add_argument("--data-root", type=Path, default=Path("data"))
+    instances.add_argument("--split", choices=("train", "val"), default="val")
+    instances.add_argument("--output", type=Path)
+    instances.add_argument(
+        "--force-download",
+        action="store_true",
+        help="Redownload the official COCO annotation archive",
+    )
+
     embeddings = commands.add_parser("embeddings", help="Compute and cache CLIP embeddings")
     embedding_commands = embeddings.add_subparsers(dest="embedding_command", required=True)
     encode = embedding_commands.add_parser(
@@ -86,6 +154,78 @@ def _parser() -> argparse.ArgumentParser:
     encode.add_argument("--limit", type=int)
     encode.add_argument("--model-cache-dir", type=Path)
     encode.add_argument("--local-files-only", action="store_true")
+
+    encode_text = embedding_commands.add_parser(
+        "encode-texts", help="Embed text hypotheses in the shared CLIP space"
+    )
+    text_source = encode_text.add_mutually_exclusive_group(required=True)
+    text_source.add_argument("--text", action="append", dest="texts")
+    text_source.add_argument(
+        "--texts-file",
+        type=Path,
+        help="Plain text lines or JSONL objects with id and text fields",
+    )
+    encode_text.add_argument("--artifacts-root", type=Path, default=Path("artifacts"))
+    encode_text.add_argument("--cache-root", type=Path)
+    encode_text.add_argument("--output", type=Path)
+    encode_text.add_argument("--model", default="openai/clip-vit-base-patch32")
+    encode_text.add_argument(
+        "--revision", default="3d74acf9a28c67741b2f4f2ea7635f0aaf6f0268"
+    )
+    encode_text.add_argument("--device", default="auto")
+    encode_text.add_argument("--batch-size", type=int, default=32)
+    encode_text.add_argument("--model-cache-dir", type=Path)
+    encode_text.add_argument("--local-files-only", action="store_true")
+
+    similarity = embedding_commands.add_parser(
+        "image-text-similarity",
+        help="Compute a validated image-by-text cosine similarity matrix",
+    )
+    similarity.add_argument("--images", type=Path, required=True)
+    similarity.add_argument("--texts", type=Path, required=True)
+    similarity.add_argument("--artifacts-root", type=Path, default=Path("artifacts"))
+    similarity.add_argument("--output", type=Path)
+
+    explanations = commands.add_parser(
+        "explanations", help="Prepare evidence and generate Mapper-node hypotheses"
+    )
+    explanation_commands = explanations.add_subparsers(
+        dest="explanation_command", required=True
+    )
+    context = explanation_commands.add_parser(
+        "prepare-context",
+        help="Select deterministic target and contrast evidence for Mapper nodes",
+    )
+    context.add_argument("--graph", type=Path, required=True)
+    context.add_argument("--embeddings", type=Path, required=True)
+    context.add_argument("--annotations", type=Path, required=True)
+    context.add_argument("--manifest", type=Path, required=True)
+    context.add_argument("--data-root", type=Path, default=Path("data"))
+    context.add_argument("--artifacts-root", type=Path, default=Path("artifacts"))
+    context.add_argument("--output", type=Path)
+    context.add_argument("--node-id", action="append", dest="node_ids")
+    context.add_argument("--representatives", type=int, default=3)
+    context.add_argument("--contrasts", type=int, default=3)
+    context.add_argument("--caption-limit", type=int, default=2)
+
+    generate = explanation_commands.add_parser(
+        "generate", help="Call OpenAI to generate structured node hypotheses"
+    )
+    generate.add_argument("--context", type=Path, required=True)
+    generate.add_argument("--artifacts-root", type=Path, default=Path("artifacts"))
+    generate.add_argument("--output", type=Path)
+    generate.add_argument("--model", default="gpt-6-astra")
+    generate.add_argument("--max-hypotheses", type=int, default=3)
+    generate.add_argument("--image-size", type=int, default=768)
+    generate.add_argument(
+        "--image-detail", choices=("low", "high", "auto", "original"), default="low"
+    )
+
+    prompts = explanation_commands.add_parser(
+        "export-prompts", help="Export generated hypothesis prompts for CLIP encoding"
+    )
+    prompts.add_argument("--explanations", type=Path, required=True)
+    prompts.add_argument("--output", type=Path, required=True)
 
     lenses = commands.add_parser("lens", help="Compute Mapper lens values")
     lens_commands = lenses.add_subparsers(dest="lens_command", required=True)
@@ -161,6 +301,23 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         }
         print(json.dumps(summary, indent=2, sort_keys=True))
         return 0
+    if args.command == "data" and args.data_command == "prepare-coco-instances":
+        subset, output = prepare_coco_instance_subset(
+            data_root=args.data_root,
+            manifest_path=args.manifest,
+            split=args.split,
+            output_path=args.output,
+            force_download=args.force_download,
+        )
+        summary = subset.summary()
+        summary.update(
+            {
+                "manifest": str(args.manifest.resolve()),
+                "output": str(output.resolve()),
+            }
+        )
+        print(json.dumps(summary, indent=2, sort_keys=True))
+        return 0
     if args.command == "embeddings" and args.embedding_command == "encode-images":
         artifacts = ArtifactPaths.from_root(args.artifacts_root)
         item_ids, image_paths = _manifest_images(args.manifest, args.data_root, args.limit)
@@ -186,6 +343,122 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         batch.save(output)
         summary = batch.metadata()
         summary.update({"device": encoder.device, "output": str(output.resolve())})
+        print(json.dumps(summary, indent=2, sort_keys=True))
+        return 0
+    if args.command == "embeddings" and args.embedding_command == "encode-texts":
+        artifacts = ArtifactPaths.from_root(args.artifacts_root)
+        item_ids, texts = _text_inputs(args.texts, args.texts_file)
+        encoder = HuggingFaceClipEncoder(
+            model_id=args.model,
+            revision=args.revision,
+            device=args.device,
+            model_cache_dir=args.model_cache_dir,
+            local_files_only=args.local_files_only,
+        )
+        cache_root = args.cache_root or artifacts.embedding_cache
+        batch = embed_texts(
+            texts,
+            encoder=encoder,
+            cache=EmbeddingCache(cache_root),
+            item_ids=item_ids,
+            batch_size=args.batch_size,
+        )
+        source_name = args.texts_file.stem if args.texts_file else "inline-texts"
+        output = args.output or (
+            artifacts.text_embeddings
+            / f"{source_name}-{encoder.text_spec.fingerprint}.npz"
+        )
+        batch.save(output)
+        summary = batch.metadata()
+        summary.update({"device": encoder.device, "output": str(output.resolve())})
+        print(json.dumps(summary, indent=2, sort_keys=True))
+        return 0
+    if (
+        args.command == "embeddings"
+        and args.embedding_command == "image-text-similarity"
+    ):
+        images = EmbeddingBatch.load(args.images)
+        texts = EmbeddingBatch.load(args.texts)
+        result = image_text_similarity(images, texts)
+        artifacts = ArtifactPaths.from_root(args.artifacts_root)
+        output = args.output or (
+            artifacts.similarities / f"{args.images.stem}-{args.texts.stem}.npz"
+        )
+        result.save(output)
+        summary = result.metadata()
+        summary["output"] = str(output.resolve())
+        print(json.dumps(summary, indent=2, sort_keys=True))
+        return 0
+    if (
+        args.command == "explanations"
+        and args.explanation_command == "prepare-context"
+    ):
+        graph = MapperGraphArtifact.load(args.graph)
+        embeddings = EmbeddingBatch.load(args.embeddings)
+        annotations = CocoInstanceSubset.load(args.annotations)
+        bundle = build_explanation_contexts(
+            graph,
+            embeddings,
+            annotations,
+            graph_path=args.graph,
+            annotations_path=args.annotations,
+            manifest_path=args.manifest,
+            data_root=args.data_root,
+            node_ids=tuple(args.node_ids) if args.node_ids else None,
+            representatives=args.representatives,
+            contrasts=args.contrasts,
+            caption_limit=args.caption_limit,
+        )
+        artifacts = ArtifactPaths.from_root(args.artifacts_root)
+        output = args.output or (
+            artifacts.explanation_contexts / f"{args.graph.stem}-context.json"
+        )
+        bundle.save(output)
+        summary = {
+            "context_count": len(bundle.contexts),
+            "node_ids": [context.node_id for context in bundle.contexts],
+            "output": str(output.resolve()),
+        }
+        print(json.dumps(summary, indent=2, sort_keys=True))
+        return 0
+    if args.command == "explanations" and args.explanation_command == "generate":
+        from clip_compass.explanations.openai_agent import OpenAIExplanationAgent
+
+        contexts = ExplanationContextBundle.load(args.context)
+        agent = OpenAIExplanationAgent(
+            model=args.model,
+            image_size=args.image_size,
+            image_detail=args.image_detail,
+        )
+        artifact = generate_explanations(
+            contexts, agent, max_hypotheses=args.max_hypotheses
+        )
+        artifacts = ArtifactPaths.from_root(args.artifacts_root)
+        output = args.output or (
+            artifacts.explanations / f"{args.context.stem}-{args.model}.json"
+        )
+        artifact.save(output)
+        summary = {
+            "node_count": len(artifact.explanations),
+            "hypothesis_count": sum(
+                len(explanation.hypotheses)
+                for explanation in artifact.explanations
+            ),
+            "model": args.model,
+            "output": str(output.resolve()),
+        }
+        print(json.dumps(summary, indent=2, sort_keys=True))
+        return 0
+    if (
+        args.command == "explanations"
+        and args.explanation_command == "export-prompts"
+    ):
+        artifact = ExplanationArtifact.load(args.explanations)
+        write_hypothesis_prompts(artifact, args.output)
+        summary = {
+            "explanation_nodes": len(artifact.explanations),
+            "output": str(args.output.resolve()),
+        }
         print(json.dumps(summary, indent=2, sort_keys=True))
         return 0
     if args.command == "lens" and args.lens_command == "compute":

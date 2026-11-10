@@ -1,4 +1,4 @@
-"""Cache-aware CLIP image embedding orchestration."""
+"""Cache-aware CLIP image and text embedding orchestration."""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ from typing import Dict, List, Optional, Sequence, Tuple
 
 import numpy as np
 
-from .base import ClipEncoder
+from .base import ClipEncoder, ClipTextEncoder
 from .cache import EmbeddingCache
 from .types import EmbeddingBatch
 
@@ -19,6 +19,10 @@ def sha256_file(path: Path, chunk_size: int = 1024 * 1024) -> str:
         for chunk in iter(lambda: source.read(chunk_size), b""):
             digest.update(chunk)
     return digest.hexdigest()
+
+
+def sha256_text(text: str) -> str:
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
 def l2_normalize(vectors: np.ndarray) -> np.ndarray:
@@ -96,4 +100,77 @@ def embed_images(
         cache_hits=cache_hits,
         model_spec=encoder.spec,
         input_sha256=digests,
+        modality="image",
+    )
+
+
+def embed_texts(
+    texts: Sequence[str],
+    *,
+    encoder: ClipTextEncoder,
+    cache: EmbeddingCache,
+    item_ids: Optional[Sequence[str]] = None,
+    batch_size: int = 32,
+) -> EmbeddingBatch:
+    """Embed exact text strings, encoding only cache misses in stable order."""
+
+    if batch_size < 1:
+        raise ValueError("batch_size must be at least 1")
+    values = tuple(texts)
+    if not values:
+        raise ValueError("at least one text value is required")
+    if any(not isinstance(value, str) or not value.strip() for value in values):
+        raise ValueError("texts must be non-empty strings")
+    ids = (
+        tuple(item_ids)
+        if item_ids is not None
+        else tuple(f"text-{index:04d}" for index in range(len(values)))
+    )
+    if len(ids) != len(values):
+        raise ValueError("item_ids must have the same length as texts")
+    if len(set(ids)) != len(ids):
+        raise ValueError("item_ids must be unique")
+
+    digests = tuple(sha256_text(value) for value in values)
+    vectors: List[Optional[np.ndarray]] = [None] * len(values)
+    cache_hits = np.zeros(len(values), dtype=np.bool_)
+    misses_by_digest: Dict[str, List[int]] = {}
+    for index, digest in enumerate(digests):
+        cached = cache.load(encoder.text_spec, "text", digest)
+        if cached is not None:
+            vectors[index] = cached
+            cache_hits[index] = True
+        else:
+            misses_by_digest.setdefault(digest, []).append(index)
+
+    unique_miss_indices = [indices[0] for indices in misses_by_digest.values()]
+    for start in range(0, len(unique_miss_indices), batch_size):
+        batch_indices = unique_miss_indices[start : start + batch_size]
+        encoded = np.asarray(
+            encoder.encode_texts([values[index] for index in batch_indices]),
+            dtype=np.float32,
+        )
+        if encoded.ndim != 2 or encoded.shape[0] != len(batch_indices):
+            raise ValueError("encoder returned an invalid text batch shape")
+        if not np.isfinite(encoded).all():
+            raise ValueError("encoder returned non-finite text values")
+        for batch_offset, index in enumerate(batch_indices):
+            vector = encoded[batch_offset]
+            digest = digests[index]
+            cache.store(encoder.text_spec, "text", digest, vector)
+            for duplicate_index in misses_by_digest[digest]:
+                vectors[duplicate_index] = vector.copy()
+
+    if any(vector is None for vector in vectors):
+        raise AssertionError("text embedding orchestration left an item unresolved")
+    raw = np.stack([vector for vector in vectors if vector is not None]).astype(np.float32)
+    return EmbeddingBatch(
+        item_ids=ids,
+        raw=raw,
+        normalized=l2_normalize(raw),
+        cache_hits=cache_hits,
+        model_spec=encoder.text_spec,
+        input_sha256=digests,
+        modality="text",
+        input_texts=values,
     )

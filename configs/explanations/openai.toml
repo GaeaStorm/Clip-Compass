@@ -1,0 +1,13 @@
+[context]
+representatives = 3
+contrasts = 3
+caption_limit = 2
+contrast_strategy = "adjacent_then_global_nearest_to_target_centroid"
+
+[agent]
+provider = "openai-responses"
+model = "gpt-6-astra"
+max_hypotheses = 3
+image_size = 768
+image_detail = "low"
+store = false

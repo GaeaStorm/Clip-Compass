@@ -206,9 +206,9 @@ cython_debug/
 tempCodeRunnerFile.py
 
 # Clip Compass datasets and generated artifacts
-data/
-artifacts/
-tmp/
+/data/
+/artifacts/
+/tmp/
 *.part
 
 # Ruff stuff:

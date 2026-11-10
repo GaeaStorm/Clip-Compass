@@ -23,8 +23,16 @@ class DataPaths:
         return self.root / "raw" / "coco" / "images"
 
     @property
+    def coco_annotations(self) -> Path:
+        return self.root / "raw" / "coco" / "annotations"
+
+    @property
     def manifests(self) -> Path:
         return self.root / "processed" / "coco_localized_narratives"
+
+    @property
+    def instance_manifests(self) -> Path:
+        return self.root / "processed" / "coco_instances"
 
 
 @dataclass(frozen=True)
@@ -44,6 +52,22 @@ class ArtifactPaths:
     @property
     def embeddings(self) -> Path:
         return self.root / "embeddings"
+
+    @property
+    def text_embeddings(self) -> Path:
+        return self.root / "text-embeddings"
+
+    @property
+    def similarities(self) -> Path:
+        return self.root / "similarities"
+
+    @property
+    def explanation_contexts(self) -> Path:
+        return self.root / "explanation-contexts"
+
+    @property
+    def explanations(self) -> Path:
+        return self.root / "explanations"
 
     @property
     def lenses(self) -> Path:

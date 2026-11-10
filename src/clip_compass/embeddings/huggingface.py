@@ -11,7 +11,7 @@ from .types import ClipModelSpec
 
 
 class HuggingFaceClipEncoder:
-    """Encode images with unnormalized CLIP projection-layer features."""
+    """Encode images and text into the shared CLIP projection space."""
 
     def __init__(
         self,
@@ -48,7 +48,8 @@ class HuggingFaceClipEncoder:
             str(model_cache_dir.expanduser().resolve()) if model_cache_dir else None
         )
         self._local_files_only = local_files_only
-        self._processor = None
+        self._image_processor = None
+        self._tokenizer = None
         self._model = None
         self._spec = ClipModelSpec(
             provider="huggingface-transformers",
@@ -56,10 +57,20 @@ class HuggingFaceClipEncoder:
             revision=revision,
             preprocessing_id=f"CLIPImageProcessor:{model_id}@{revision}",
         )
+        self._text_spec = ClipModelSpec(
+            provider="huggingface-transformers",
+            model_id=model_id,
+            revision=revision,
+            preprocessing_id=f"CLIPTokenizerFast:{model_id}@{revision}",
+        )
 
     @property
     def spec(self) -> ClipModelSpec:
         return self._spec
+
+    @property
+    def text_spec(self) -> ClipModelSpec:
+        return self._text_spec
 
     @property
     def device(self) -> str:
@@ -68,12 +79,6 @@ class HuggingFaceClipEncoder:
     def _load_model(self) -> None:
         if self._model is not None:
             return
-        self._processor = self._transformers.CLIPImageProcessor.from_pretrained(
-            self._model_id,
-            revision=self._revision,
-            cache_dir=self._cache_dir,
-            local_files_only=self._local_files_only,
-        )
         self._model = self._transformers.CLIPModel.from_pretrained(
             self._model_id,
             revision=self._revision,
@@ -93,15 +98,52 @@ class HuggingFaceClipEncoder:
         for path in image_paths:
             with Image.open(path) as image:
                 images.append(image.convert("RGB").copy())
-        if self._processor is None or self._model is None:
+        if self._image_processor is None:
+            self._image_processor = self._transformers.CLIPImageProcessor.from_pretrained(
+                self._model_id,
+                revision=self._revision,
+                cache_dir=self._cache_dir,
+                local_files_only=self._local_files_only,
+            )
+        if self._model is None:
             raise AssertionError("CLIP model failed to initialize")
-        inputs = self._processor(images=images, return_tensors="pt")
+        inputs = self._image_processor(images=images, return_tensors="pt")
         pixel_values = inputs["pixel_values"].to(self._device)
         with self._torch.inference_mode():
             output = self._model.get_image_features(pixel_values=pixel_values)
 
         # Transformers <5 returns a Tensor. The current main branch returns a
         # model output whose pooler_output is already projected to CLIP space.
+        if self._torch.is_tensor(output):
+            features = output
+        elif hasattr(output, "pooler_output"):
+            features = output.pooler_output
+        elif isinstance(output, tuple) and output:
+            features = output[0]
+        else:
+            raise TypeError(f"Unexpected CLIP feature output: {type(output)!r}")
+        return features.detach().to("cpu", dtype=self._torch.float32).numpy()
+
+    def encode_texts(self, texts: Sequence[str]) -> np.ndarray:
+        self._load_model()
+        if self._tokenizer is None:
+            self._tokenizer = self._transformers.CLIPTokenizerFast.from_pretrained(
+                self._model_id,
+                revision=self._revision,
+                cache_dir=self._cache_dir,
+                local_files_only=self._local_files_only,
+            )
+        if self._model is None:
+            raise AssertionError("CLIP model failed to initialize")
+        inputs = self._tokenizer(
+            list(texts),
+            padding=True,
+            truncation=True,
+            return_tensors="pt",
+        )
+        inputs = {name: value.to(self._device) for name, value in inputs.items()}
+        with self._torch.inference_mode():
+            output = self._model.get_text_features(**inputs)
         if self._torch.is_tensor(output):
             features = output
         elif hasattr(output, "pooler_output"):

@@ -7,3 +7,4 @@ data_root = "data"
 [sources]
 localized_narratives = "https://storage.googleapis.com/localized-narratives/annotations/coco_val_captions.jsonl"
 coco_images = "http://images.cocodataset.org/val2017"
+coco_instances = "http://images.cocodataset.org/annotations/annotations_trainval2017.zip"
