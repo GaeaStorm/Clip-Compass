@@ -1,0 +1,311 @@
+{
+  "components": [
+    [
+      "node-0000",
+      "node-0001"
+    ],
+    [
+      "node-0002",
+      "node-0003",
+      "node-0004"
+    ]
+  ],
+  "config": {
+    "eps": null,
+    "eps_fallback_quantile": 0.9,
+    "eps_sample_size": 5000,
+    "feature_space": "normalized",
+    "metric": "euclidean",
+    "min_intersection": 1,
+    "min_samples": 3,
+    "n_cubes": 8,
+    "n_jobs": 1,
+    "perc_overlap": 0.4,
+    "random_seed": 42,
+    "remove_duplicate_nodes": true
+  },
+  "diagnostics": {
+    "assigned_item_count": 22,
+    "component_count": 2,
+    "coverage_fraction": 0.88,
+    "edge_count": 3,
+    "isolated_node_count": 0,
+    "multi_membership_item_count": 14,
+    "node_count": 5,
+    "node_size_max": 13,
+    "node_size_median": 5.0,
+    "node_size_min": 3,
+    "total_memberships": 36,
+    "unassigned_item_count": 3
+  },
+  "edges": [
+    {
+      "intersection_indices": [
+        4,
+        6,
+        21
+      ],
+      "intersection_item_ids": [
+        "34205",
+        "300233",
+        "8277"
+      ],
+      "intersection_size": 3,
+      "jaccard": 0.6,
+      "source": "node-0000",
+      "target": "node-0001"
+    },
+    {
+      "intersection_indices": [
+        1,
+        7,
+        9,
+        17
+      ],
+      "intersection_item_ids": [
+        "51976",
+        "253433",
+        "216739",
+        "435205"
+      ],
+      "intersection_size": 4,
+      "jaccard": 0.2857142857142857,
+      "source": "node-0002",
+      "target": "node-0003"
+    },
+    {
+      "intersection_indices": [
+        0,
+        5,
+        10,
+        11,
+        12,
+        16,
+        20
+      ],
+      "intersection_item_ids": [
+        "220732",
+        "205647",
+        "549136",
+        "198805",
+        "357941",
+        "327890",
+        "370208"
+      ],
+      "intersection_size": 7,
+      "jaccard": 0.4375,
+      "source": "node-0003",
+      "target": "node-0004"
+    }
+  ],
+  "embedding_model": {
+    "model_id": "openai/clip-vit-base-patch32",
+    "preprocessing_id": "CLIPImageProcessor:openai/clip-vit-base-patch32@3d74acf9a28c67741b2f4f2ea7635f0aaf6f0268",
+    "provider": "huggingface-transformers",
+    "revision": "3d74acf9a28c67741b2f4f2ea7635f0aaf6f0268",
+    "schema_version": 1
+  },
+  "embedding_model_fingerprint": "587e8abe5ecfba213a05",
+  "eps_calibration": {
+    "distance_max": 1.0826723408993875,
+    "distance_median": 0.899387346074501,
+    "distance_min": 0.7026286422888017,
+    "eps": 0.9535611142975092,
+    "knee_index": 20,
+    "method": "k_distance_knee",
+    "metric": "euclidean",
+    "min_samples": 3,
+    "quantile": 0.9,
+    "sample_count": 25,
+    "sample_size_limit": 5000
+  },
+  "feature_space": "normalized",
+  "item_ids": [
+    "220732",
+    "51976",
+    "551660",
+    "285047",
+    "34205",
+    "205647",
+    "300233",
+    "253433",
+    "118594",
+    "216739",
+    "549136",
+    "198805",
+    "357941",
+    "33221",
+    "313454",
+    "161008",
+    "327890",
+    "435205",
+    "117525",
+    "183709",
+    "370208",
+    "8277",
+    "30785",
+    "459954",
+    "567898"
+  ],
+  "lens": {
+    "item_count": 25,
+    "maximum": 1.0,
+    "minimum": 0.0,
+    "name": "pca1_normalized",
+    "parameters": {
+      "sign_rule": "largest_absolute_loading_is_positive"
+    },
+    "scaled": true,
+    "source": "normalized"
+  },
+  "nodes": [
+    {
+      "component_id": "component-0000",
+      "id": "node-0000",
+      "item_ids": [
+        "551660",
+        "34205",
+        "300233",
+        "8277",
+        "30785"
+      ],
+      "lens": {
+        "max": 0.16223953007506373,
+        "mean": 0.10169851105834551,
+        "min": 0.0
+      },
+      "member_indices": [
+        2,
+        4,
+        6,
+        21,
+        22
+      ],
+      "size": 5,
+      "source_id": "cube0_cluster0"
+    },
+    {
+      "component_id": "component-0000",
+      "id": "node-0001",
+      "item_ids": [
+        "34205",
+        "300233",
+        "8277"
+      ],
+      "lens": {
+        "max": 0.16223953007506373,
+        "mean": 0.15830769356914798,
+        "min": 0.15147312645563352
+      },
+      "member_indices": [
+        4,
+        6,
+        21
+      ],
+      "size": 3,
+      "source_id": "cube1_cluster0"
+    },
+    {
+      "component_id": "component-0001",
+      "id": "node-0002",
+      "item_ids": [
+        "51976",
+        "253433",
+        "216739",
+        "161008",
+        "435205"
+      ],
+      "lens": {
+        "max": 0.7774376720663841,
+        "mean": 0.7491239622631563,
+        "min": 0.6943632497191603
+      },
+      "member_indices": [
+        1,
+        7,
+        9,
+        15,
+        17
+      ],
+      "size": 5,
+      "source_id": "cube4_cluster0"
+    },
+    {
+      "component_id": "component-0001",
+      "id": "node-0003",
+      "item_ids": [
+        "220732",
+        "51976",
+        "205647",
+        "253433",
+        "118594",
+        "216739",
+        "549136",
+        "198805",
+        "357941",
+        "327890",
+        "435205",
+        "117525",
+        "370208"
+      ],
+      "lens": {
+        "max": 0.913002753275434,
+        "mean": 0.8234462914619358,
+        "min": 0.7504862957102048
+      },
+      "member_indices": [
+        0,
+        1,
+        5,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        16,
+        17,
+        18,
+        20
+      ],
+      "size": 13,
+      "source_id": "cube5_cluster0"
+    },
+    {
+      "component_id": "component-0001",
+      "id": "node-0004",
+      "item_ids": [
+        "220732",
+        "285047",
+        "205647",
+        "549136",
+        "198805",
+        "357941",
+        "327890",
+        "183709",
+        "370208",
+        "459954"
+      ],
+      "lens": {
+        "max": 1.0,
+        "mean": 0.8858004703878685,
+        "min": 0.8391268277247037
+      },
+      "member_indices": [
+        0,
+        3,
+        5,
+        10,
+        11,
+        12,
+        16,
+        19,
+        20,
+        23
+      ],
+      "size": 10,
+      "source_id": "cube6_cluster0"
+    }
+  ],
+  "schema_version": 1
+}

@@ -207,7 +207,10 @@ tempCodeRunnerFile.py
 
 # Clip Compass datasets and generated artifacts
 /data/
-/artifacts/
+/artifacts/*
+!/artifacts/embeddings/
+!/artifacts/explanations/
+!/artifacts/mapper/
 /tmp/
 *.part
 

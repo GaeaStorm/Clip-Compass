@@ -1,0 +1,159 @@
+{
+  "annotations_sha256": "e2f7854c897a3e0614e83407ad0f95b158595dc8de058ab792831e69390851aa",
+  "context_config": {
+    "caption_limit": 2,
+    "contrast_strategy": "adjacent_then_global_nearest_to_target_centroid",
+    "contrasts": 3,
+    "feature_space": "normalized",
+    "representatives": 3
+  },
+  "embedding_model_fingerprint": "587e8abe5ecfba213a05",
+  "explanations": [
+    {
+      "hypotheses": [
+        {
+          "coco_categories": [
+            "broccoli"
+          ],
+          "confidence": 0.9,
+          "counterexample_item_ids": [
+            "567898",
+            "161008",
+            "370208"
+          ],
+          "description": "The node is organized around prepared food images containing broccoli.",
+          "name": "Broccoli-centered food",
+          "negative_prompt": "a photo of food without broccoli",
+          "positive_prompt": "a photo of food containing broccoli",
+          "predicted_effect": "decrease_text_similarity",
+          "rationale": "Broccoli appears in all three representative target images and is absent from the selected contrasts.",
+          "supporting_item_ids": [
+            "551660",
+            "30785",
+            "34205"
+          ]
+        }
+      ],
+      "node_id": "node-0000",
+      "response_id": "offline-fixture-node-0000",
+      "summary": "A compact food neighborhood dominated by plates and bowls containing broccoli."
+    },
+    {
+      "hypotheses": [
+        {
+          "coco_categories": [
+            "bottle",
+            "fork"
+          ],
+          "confidence": 0.72,
+          "counterexample_item_ids": [
+            "551660",
+            "30785",
+            "567898"
+          ],
+          "description": "The node emphasizes utensils and containers used in food preparation rather than food alone.",
+          "name": "Food preparation implements",
+          "negative_prompt": "a food scene without a bottle or fork",
+          "positive_prompt": "a food preparation scene containing a bottle or fork",
+          "predicted_effect": "decrease_text_similarity",
+          "rationale": "A bottle appears in target 300233 and a fork appears in target 8277, while the selected contrasts lack both requested categories.",
+          "supporting_item_ids": [
+            "300233",
+            "8277"
+          ]
+        }
+      ],
+      "node_id": "node-0001",
+      "response_id": "offline-fixture-node-0001",
+      "summary": "A food-preparation neighborhood containing bowls, utensils, bottles, and plated ingredients."
+    },
+    {
+      "hypotheses": [
+        {
+          "coco_categories": [
+            "couch",
+            "teddy bear"
+          ],
+          "confidence": 0.67,
+          "counterexample_item_ids": [
+            "549136",
+            "118594",
+            "370208"
+          ],
+          "description": "One coherent visual motif in this mixed node is a teddy bear placed on a couch.",
+          "name": "Teddy bear with couch context",
+          "negative_prompt": "a teddy bear outdoors without a couch",
+          "positive_prompt": "a teddy bear sitting on a couch",
+          "predicted_effect": "decrease_text_similarity",
+          "rationale": "Target 253433 contains both a teddy bear and couch, whereas the closest teddy-bear contrast is outdoors without a couch.",
+          "supporting_item_ids": [
+            "253433"
+          ]
+        }
+      ],
+      "node_id": "node-0002",
+      "response_id": "offline-fixture-node-0002",
+      "summary": "A heterogeneous object neighborhood with a distinctive teddy-bear-on-couch example among its representatives."
+    },
+    {
+      "hypotheses": [
+        {
+          "coco_categories": [
+            "person"
+          ],
+          "confidence": 0.58,
+          "counterexample_item_ids": [
+            "161008"
+          ],
+          "description": "Human presence may contribute to this broad outdoor and object-centered neighborhood.",
+          "name": "Person presence",
+          "negative_prompt": "a photo without a person",
+          "positive_prompt": "a photo containing a person",
+          "predicted_effect": "decrease_text_similarity",
+          "rationale": "People occur repeatedly across the full node membership, although the representative set also shows substantial visual diversity.",
+          "supporting_item_ids": [
+            "370208"
+          ]
+        }
+      ],
+      "node_id": "node-0003",
+      "response_id": "offline-fixture-node-0003",
+      "summary": "A large, diverse neighborhood spanning outdoor scenes, vehicles, animals, and images containing people."
+    },
+    {
+      "hypotheses": [
+        {
+          "coco_categories": [
+            "person"
+          ],
+          "confidence": 0.62,
+          "counterexample_item_ids": [
+            "118594",
+            "216739"
+          ],
+          "description": "People appear within built or street environments in this end of the Mapper component.",
+          "name": "Person presence in built scenes",
+          "negative_prompt": "a photo without a person",
+          "positive_prompt": "a photo containing a person",
+          "predicted_effect": "decrease_text_similarity",
+          "rationale": "Two representative targets contain people in street or indoor built settings, while the animal contrasts do not contain people.",
+          "supporting_item_ids": [
+            "370208",
+            "459954"
+          ]
+        }
+      ],
+      "node_id": "node-0004",
+      "response_id": "offline-fixture-node-0004",
+      "summary": "A built-environment neighborhood containing street and indoor scenes, frequently with people or vehicles."
+    }
+  ],
+  "generator": {
+    "max_hypotheses": 1,
+    "model": "human-reviewed-context-fixture-v1",
+    "provider": "offline-fixture",
+    "structured_output": true
+  },
+  "graph_sha256": "65a71a7adefdf067260809d629eac754696cf34e9417d342ab845f06ef3a86a2",
+  "schema_version": 1
+}
