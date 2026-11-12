@@ -29,12 +29,12 @@ from clip_compass.mapper.builder import MapperConfig, build_mapper_graph
 from clip_compass.mapper.diagnostics import write_mapper_diagnostic_report
 from clip_compass.mapper.graph import MapperGraphArtifact
 from clip_compass.mapper.lenses import LENS_NAMES, LensResult, compute_lens
+from clip_compass.perturbation.service import verify_hypotheses
 from clip_compass.perturbation.verify import (
     FILLS,
     PerturbationConfig,
     format_summary,
     verified_explanations,
-    verify_hypotheses,
 )
 
 

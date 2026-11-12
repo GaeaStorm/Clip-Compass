@@ -29,12 +29,12 @@ from clip_compass.perturbation.masks import (
     dilate,
     visible_pixels,
 )
+from clip_compass.perturbation.service import verify_hypotheses
 from clip_compass.perturbation.verify import (
     PerturbationConfig,
-    _verdict,
+    decide,
     load_results,
     verified_explanations,
-    verify_hypotheses,
 )
 
 HAS_PIL = importlib.util.find_spec("PIL") is not None
@@ -113,7 +113,7 @@ def _image(status="testable", centroid=False, prompt=False):
 
 
 def _judge(images, categories=("apple",), unknown=(), effect="decrease_text_similarity"):
-    return _verdict(categories, unknown, effect, len(images) or 2, images, PerturbationConfig())
+    return decide(categories, unknown, effect, len(images) or 2, images, PerturbationConfig())
 
 
 class MaskTests(unittest.TestCase):
