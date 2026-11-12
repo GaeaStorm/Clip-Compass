@@ -29,6 +29,13 @@ from clip_compass.mapper.builder import MapperConfig, build_mapper_graph
 from clip_compass.mapper.diagnostics import write_mapper_diagnostic_report
 from clip_compass.mapper.graph import MapperGraphArtifact
 from clip_compass.mapper.lenses import LENS_NAMES, LensResult, compute_lens
+from clip_compass.perturbation.verify import (
+    FILLS,
+    PerturbationConfig,
+    format_summary,
+    verified_explanations,
+    verify_hypotheses,
+)
 
 
 def _manifest_images(
@@ -226,6 +233,39 @@ def _parser() -> argparse.ArgumentParser:
     )
     prompts.add_argument("--explanations", type=Path, required=True)
     prompts.add_argument("--output", type=Path, required=True)
+
+    perturb = commands.add_parser(
+        "perturb", help="Verify hypotheses by masking objects and re-embedding images"
+    )
+    perturb_commands = perturb.add_subparsers(dest="perturb_command", required=True)
+    perturb_run = perturb_commands.add_parser(
+        "run", help="Mask hypothesis objects and random controls, embed, and judge"
+    )
+    perturb_run.add_argument("--graph", type=Path, required=True)
+    perturb_run.add_argument("--embeddings", type=Path, required=True)
+    perturb_run.add_argument("--annotations", type=Path, required=True)
+    perturb_run.add_argument("--manifest", type=Path, required=True)
+    perturb_run.add_argument("--explanations", type=Path, required=True)
+    perturb_run.add_argument("--data-root", type=Path, default=Path("data"))
+    perturb_run.add_argument("--artifacts-root", type=Path, default=Path("artifacts"))
+    perturb_run.add_argument("--output-dir", type=Path)
+    perturb_run.add_argument("--cache-root", type=Path)
+    perturb_run.add_argument("--controls", type=int, default=39)
+    perturb_run.add_argument("--seed", type=int, default=0)
+    perturb_run.add_argument("--fill", choices=sorted(FILLS), default="mean")
+    perturb_run.add_argument(
+        "--verified-output",
+        type=Path,
+        help="Also write only the supported hypotheses as an explanation artifact",
+    )
+    perturb_run.add_argument("--model", default="openai/clip-vit-base-patch32")
+    perturb_run.add_argument(
+        "--revision", default="3d74acf9a28c67741b2f4f2ea7635f0aaf6f0268"
+    )
+    perturb_run.add_argument("--device", default="auto")
+    perturb_run.add_argument("--batch-size", type=int, default=16)
+    perturb_run.add_argument("--model-cache-dir", type=Path)
+    perturb_run.add_argument("--local-files-only", action="store_true")
 
     lenses = commands.add_parser("lens", help="Compute Mapper lens values")
     lens_commands = lenses.add_subparsers(dest="lens_command", required=True)
@@ -459,6 +499,43 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             "explanation_nodes": len(artifact.explanations),
             "output": str(args.output.resolve()),
         }
+        print(json.dumps(summary, indent=2, sort_keys=True))
+        return 0
+    if args.command == "perturb" and args.perturb_command == "run":
+        artifacts = ArtifactPaths.from_root(args.artifacts_root)
+        output_dir = args.output_dir or (artifacts.perturbations / args.explanations.stem)
+        encoder = HuggingFaceClipEncoder(
+            model_id=args.model,
+            revision=args.revision,
+            device=args.device,
+            model_cache_dir=args.model_cache_dir,
+            local_files_only=args.local_files_only,
+        )
+        results = verify_hypotheses(
+            graph_path=args.graph,
+            embeddings_path=args.embeddings,
+            annotations_path=args.annotations,
+            explanations_path=args.explanations,
+            manifest_path=args.manifest,
+            data_root=args.data_root,
+            encoder=encoder,
+            cache=EmbeddingCache(args.cache_root or artifacts.embedding_cache),
+            output_dir=output_dir,
+            config=PerturbationConfig(controls=args.controls, seed=args.seed, fill=args.fill),
+            batch_size=args.batch_size,
+        )
+        print(format_summary(results))
+        summary = {
+            "min_identity_cosine": results["min_identity_cosine"],
+            "output": str((output_dir / "verification.json").resolve()),
+        }
+        if args.verified_output:
+            verified = verified_explanations(results, args.explanations)
+            if verified is None:
+                summary["verified_output"] = "none written: no hypothesis was supported"
+            else:
+                verified.save(args.verified_output)
+                summary["verified_output"] = str(args.verified_output.resolve())
         print(json.dumps(summary, indent=2, sort_keys=True))
         return 0
     if args.command == "lens" and args.lens_command == "compute":

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections import Counter
 from pathlib import Path
-from typing import Dict, Iterable, List, Mapping, Optional, Set, Tuple
+from typing import Dict, Iterable, List, Mapping, Optional, Sequence, Set, Tuple
 
 import numpy as np
 
@@ -14,6 +14,15 @@ from clip_compass.mapper.diagnostics import ManifestImage, load_manifest_images
 from clip_compass.mapper.graph import MapperGraphArtifact
 
 from .types import EvidenceItem, ExplanationContextBundle, NodeExplanationContext
+
+
+def node_centroid(features: np.ndarray, member_indices: Sequence[int]) -> np.ndarray:
+    """Plain mean of member feature vectors, deliberately not re-normalized."""
+
+    members = np.asarray(member_indices, dtype=np.int64)
+    if not members.size:
+        raise ValueError("a node centroid requires at least one member")
+    return features[members].mean(axis=0)
 
 
 def _nearest_indices(
@@ -90,8 +99,7 @@ def build_explanation_contexts(
     for node_id in selected_ids:
         node = nodes_by_id[node_id]
         member_set = set(node.member_indices)
-        member_array = np.asarray(node.member_indices, dtype=np.int64)
-        centroid = features[member_array].mean(axis=0)
+        centroid = node_centroid(features, node.member_indices)
         target_indices = _nearest_indices(
             node.member_indices, features, centroid, representatives
         )

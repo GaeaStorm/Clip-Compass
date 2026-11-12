@@ -238,5 +238,42 @@ Export the positive and negative CLIP prompts for the next scoring stage:
   --output artifacts/explanations/node-0000-prompts.jsonl
 ```
 
+## Perturbation verification
+
+Test each hypothesis by masking the COCO objects it names, re-embedding the
+images with CLIP, and comparing the shift with area-matched random masks:
+
+```bash
+.venv/bin/clip-compass perturb run \
+  --graph artifacts/mapper/coco_val_first_25-pca1_normalized-mapper.json \
+  --embeddings artifacts/embeddings/coco_val_first_25-clip-vit-b32.npz \
+  --annotations data/processed/coco_instances/coco_val_first_25-instances.json \
+  --manifest data/processed/coco_localized_narratives/coco_val_first_25.jsonl \
+  --data-root data \
+  --explanations artifacts/explanations/coco_val_first_25-all-nodes-offline-fixture.json \
+  --model-cache-dir artifacts/models/huggingface \
+  --verified-output artifacts/explanations/coco_val_first_25-verified.json
+```
+
+For every node member containing the named categories, the run fills the
+(3 px dilated) segmentation masks with CLIP's mean colour and writes a lossless
+PNG. It also writes 39 controls: the same visible mask, shifted to random
+positions inside the region CLIP's centre crop actually sees. Seeds derive from
+the image and categories, so runs are deterministic, and the perturbed images go
+through the normal embedding cache. Objects covering less than 1% of the visible
+crop, or too large to leave room for controls, are recorded but not tested.
+
+Each image is scored against its own controls on two statistics: the increase
+in distance from the node centroid, and the drop in similarity to the positive
+prompt. A hypothesis is `supported` when a strict majority of testable members
+beat their controls (empirical p <= 0.05) on centroid distance, and
+`detected_not_explanatory` when only the prompt test passes. It is
+`not_supported` when neither passes or the categories are visible in fewer than
+half the members, and `untestable` (with a reason) otherwise.
+`prediction_confirmed` records whether the explanation agent's own
+`predicted_effect` came true. `--verified-output` writes only the supported
+hypotheses as an explanation artifact, for comparison with the unfiltered set.
+
 See [the manual pipeline test](docs/manual-pipeline-test.md) for a one-node smoke
-test, CLIP discrimination check, and complete rebuild sequence.
+test, CLIP discrimination check, perturbation verification, and complete rebuild
+sequence.

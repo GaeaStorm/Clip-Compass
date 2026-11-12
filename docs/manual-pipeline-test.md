@@ -11,7 +11,7 @@ LOKY_MAX_CPU_COUNT=8 .venv/bin/python -m unittest discover -s tests -v
 .venv/bin/python -m pip check
 ```
 
-The suite should report 25 passing tests. `LOKY_MAX_CPU_COUNT` only prevents a
+The suite should report 37 passing tests. `LOKY_MAX_CPU_COUNT` only prevents a
 macOS/joblib CPU-detection warning in restricted environments.
 
 ## 2. Inspect the Mapper report
@@ -132,7 +132,45 @@ PY
 A useful positive hypothesis should generally have a positive inside-minus-outside
 margin. This smoke check is descriptive, not the final statistical evaluation.
 
-## 6. Rebuild the complete local pipeline
+## 6. Verify hypotheses with image perturbations
+
+This step uses the committed offline fixture, so it makes no API call:
+
+```bash
+.venv/bin/clip-compass perturb run \
+  --graph artifacts/mapper/coco_val_first_25-pca1_normalized-mapper.json \
+  --embeddings artifacts/embeddings/coco_val_first_25-clip-vit-b32.npz \
+  --annotations data/processed/coco_instances/coco_val_first_25-instances.json \
+  --manifest data/processed/coco_localized_narratives/coco_val_first_25.jsonl \
+  --data-root data \
+  --explanations artifacts/explanations/coco_val_first_25-all-nodes-offline-fixture.json \
+  --model-cache-dir artifacts/models/huggingface \
+  --local-files-only \
+  --verified-output artifacts/explanations/coco_val_first_25-verified.json
+```
+
+Check that `min_identity_cosine` is at least 0.999. The run refuses to continue
+below that, because the unmasked PNGs would no longer match the stored
+embeddings. The printed table should show this pattern for the current fixture:
+
+| Hypothesis | Verdict | Why |
+|---|---|---|
+| node-0000 broccoli | `detected_not_explanatory` | prompt drop beats controls on 3/4 images; centroid distance on 0/4 |
+| node-0001 bottle+fork | `not_supported: no_exceedance` | 2 testable images, neither beats its controls |
+| node-0002 couch+teddy bear | `not_supported: low_coverage` | visible in 2 of 5 members |
+| node-0003 / node-0004 person | `not_supported: low_coverage` | visible in 2 of 13 and 3 of 10 members |
+
+No hypothesis is supported, so no verified file is written.
+
+Open `artifacts/perturbations/coco_val_first_25-all-nodes-offline-fixture/images/551660/`.
+Check that `*__object.png` greys out the annotated broccoli, and that the
+`*__ctrl-s0-*.png` controls are grey patches of the same shape inside the
+central 424x424 band that CLIP's centre crop keeps. COCO annotates only five
+broccoli pieces in this image, so most of the broccoli in the bowl stays
+visible. Run the command again: every image should be a cache hit, and
+`shasum verification.json` should not change.
+
+## 7. Rebuild the complete local pipeline
 
 Use explicit output paths so subsequent commands are copy-pasteable:
 

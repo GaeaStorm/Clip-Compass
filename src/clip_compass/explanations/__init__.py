@@ -1,6 +1,6 @@
 """Mapper-node explanation context and hypothesis generation."""
 
-from .context import build_explanation_contexts
+from .context import build_explanation_contexts, node_centroid
 from .service import generate_explanations, write_hypothesis_prompts
 from .types import (
     EvidenceItem,
@@ -9,6 +9,7 @@ from .types import (
     ExplanationHypothesis,
     NodeExplanation,
     NodeExplanationContext,
+    hypothesis_id,
 )
 
 __all__ = [
@@ -20,5 +21,7 @@ __all__ = [
     "NodeExplanationContext",
     "build_explanation_contexts",
     "generate_explanations",
+    "hypothesis_id",
+    "node_centroid",
     "write_hypothesis_prompts",
 ]
