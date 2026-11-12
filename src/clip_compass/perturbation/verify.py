@@ -4,7 +4,8 @@ For each node member that contains the hypothesis categories, the object mask an
 ``controls`` area-matched random masks are filled and re-embedded. An image *exceeds*
 on a statistic when the object mask beats its controls (empirical p <= alpha):
 
-- ``centroid``: increase in distance from the node centroid
+- ``centroid``: increase in distance from the node centroid (leave-one-out: the
+  image under test is excluded from its own centroid)
 - ``prompt``: drop in cosine similarity to the hypothesis's positive prompt
 
 Verdict rules, in order:
@@ -286,10 +287,16 @@ def verify_hypotheses(
     # 3. Score each testable image against its controls, then judge each hypothesis.
     for result in hypotheses:
         node = nodes[result["node_id"]]
-        centroid = node_centroid(embeddings.normalized, node.member_indices).astype(np.float64)
         for image in result["images"]:
             if image["status"] != "testable":
                 continue
+            # Leave the image under test out of its own centroid; otherwise it pulls the
+            # centroid towards itself, which weakens the test most in small nodes.
+            position = graph.item_ids.index(image["item_id"])
+            others = [index for index in node.member_indices if index != position]
+            centroid = node_centroid(
+                embeddings.normalized, others or node.member_indices
+            ).astype(np.float64)
             baseline = vectors[f"{image['item_id']}__identity"]
             points = np.stack([vectors[variant] for variant in image.pop("variants")])
             positive = prompts[result["hypothesis_id"]]
