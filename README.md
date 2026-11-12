@@ -4,6 +4,17 @@ Clip Compass expands on [Explainable Mapper](https://arxiv.org/html/2507.18607v1
 by exploring CLIP image embedding spaces and testing whether visual perturbations
 can verify explanations of how images are grouped.
 
+**Visual walkthrough:** download
+[`docs/clip-compass.html`](docs/clip-compass.html) and open it in a browser. It
+walks through every pipeline stage with the 25-photo test run's real photos,
+groups, masked images and verdicts, and shows who owns each stage. It is a
+snapshot; to refresh it after a new run:
+
+```bash
+.venv/bin/python scripts/build_explorer.py
+cp artifacts/diagnostics/explorer/explorer.html docs/clip-compass.html
+```
+
 ## Current pipeline
 
 The first implemented stage prepares a deterministic subset of COCO images paired
