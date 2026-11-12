@@ -1,0 +1,1452 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Clip Compass</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400..800&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: a navigator's chart table. A two-track pipeline map on the left drives
+   one stage "sheet" at a time on graticule paper; colour only ever means a person
+   or a kind of edit. */
+:root {
+  color-scheme: light;
+  --bg: #eef2f4;
+  --surface: #f9fbfc;
+  --raised: #ffffff;
+  --wash: #e5ebef;
+  --ink: #0e1b2a;
+  --ink-2: #44525f;
+  --ink-3: #74818d;
+  --line: #d3dbe1;
+  --grid: #e1e7eb;
+  --hidden: #eb6834;
+  --patch: #2a78d6;
+  --gayatri: #1baf7a;
+  --dhruv: #eda100;
+  --joe: #6250d6;
+  --team: #74818d;
+  --good: #0ca30c;
+  --bad: #d03b3b;
+  --div-neg: #2a78d6;
+  --div-mid: #f0efec;
+  --div-pos: #e34948;
+  --shadow: 0 1px 2px rgba(14, 27, 42, .06), 0 8px 28px rgba(14, 27, 42, .07);
+  --display: "Bricolage Grotesque", "Avenir Next", "Segoe UI", system-ui, sans-serif;
+  --body: "IBM Plex Sans", "Helvetica Neue", "Segoe UI", system-ui, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --bg: #0b1118;
+    --surface: #101821;
+    --raised: #16202b;
+    --wash: #142029;
+    --ink: #e8eef3;
+    --ink-2: #a9b5c0;
+    --ink-3: #6f7d8a;
+    --line: #233140;
+    --grid: #131d27;
+    --hidden: #d95926;
+    --patch: #3987e5;
+    --gayatri: #199e70;
+    --dhruv: #c98500;
+    --joe: #9085e9;
+    --team: #6f7d8a;
+    --div-neg: #3987e5;
+    --div-mid: #383835;
+    --div-pos: #e66767;
+    --shadow: 0 1px 2px rgba(0, 0, 0, .3), 0 10px 30px rgba(0, 0, 0, .35);
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #0b1118;
+  --surface: #101821;
+  --raised: #16202b;
+  --wash: #142029;
+  --ink: #e8eef3;
+  --ink-2: #a9b5c0;
+  --ink-3: #6f7d8a;
+  --line: #233140;
+  --grid: #131d27;
+  --hidden: #d95926;
+  --patch: #3987e5;
+  --gayatri: #199e70;
+  --dhruv: #c98500;
+  --joe: #9085e9;
+  --team: #6f7d8a;
+  --div-neg: #3987e5;
+  --div-mid: #383835;
+  --div-pos: #e66767;
+  --shadow: 0 1px 2px rgba(0, 0, 0, .3), 0 10px 30px rgba(0, 0, 0, .35);
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font: 16px/1.6 var(--body);
+  -webkit-font-smoothing: antialiased;
+}
+button { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; border-radius: 6px; }
+img { max-width: 100%; }
+
+/* ---------- shell */
+.app { display: grid; grid-template-columns: 296px minmax(0, 1fr); min-height: 100vh; }
+.rail {
+  position: sticky; top: 0; height: 100vh; overflow-y: auto;
+  background: var(--surface); border-right: 1px solid var(--line);
+  display: flex; flex-direction: column; gap: 22px;
+  padding-block: 26px 22px; padding-left: max(18px, env(safe-area-inset-left, 0px)); padding-right: 18px;
+}
+.brand { display: flex; align-items: center; gap: 11px; background: none; border: 0; padding: 0; cursor: pointer; text-align: left; }
+.brand svg { flex: none; }
+.brand b { font: 700 21px/1 var(--display); letter-spacing: -.02em; display: block; }
+.brand span { font: 500 10.5px/1.4 var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--ink-3); }
+.intro-btn {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%;
+  padding: 11px 14px; border-radius: 10px; border: 1px solid var(--line); background: var(--raised);
+  cursor: pointer; text-align: left; font-weight: 600; font-size: 14.5px;
+}
+.intro-btn[aria-current="page"] { border-color: var(--ink); box-shadow: inset 0 0 0 1px var(--ink); }
+.intro-btn small { font: 500 10.5px var(--mono); letter-spacing: .1em; color: var(--ink-3); text-transform: uppercase; }
+.rail-label { font: 500 10.5px var(--mono); letter-spacing: .14em; text-transform: uppercase; color: var(--ink-3); margin: 0 0 6px; }
+.track { position: relative; }
+.track-gfx { position: absolute; inset: 0; pointer-events: none; overflow: visible; }
+.steps { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; position: relative; }
+.step {
+  display: block; width: 100%; text-align: left; background: none; border: 0; cursor: pointer;
+  padding: 9px 10px 9px 58px; border-radius: 10px; position: relative; transition: background .15s, opacity .2s;
+}
+.step:hover { background: var(--wash); }
+.step[aria-current="page"] { background: var(--raised); box-shadow: var(--shadow); }
+.step.dim { opacity: .32; }
+.step .n { font: 500 10.5px var(--mono); color: var(--ink-3); letter-spacing: .08em; }
+.step .t { display: block; font: 650 15.5px/1.25 var(--display); letter-spacing: -.01em; margin: 1px 0 3px; }
+.step .m { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--ink-2); }
+.step .mk { position: absolute; top: 15px; width: 16px; height: 16px; line-height: 0; }
+.team { margin-top: auto; border-top: 1px solid var(--line); padding-top: 16px; display: flex; flex-direction: column; gap: 4px; }
+.person {
+  display: grid; grid-template-columns: 30px 1fr; gap: 10px; align-items: center; text-align: left;
+  background: none; border: 0; padding: 6px 8px; border-radius: 9px; cursor: pointer;
+}
+.person:hover, .person[aria-pressed="true"] { background: var(--wash); }
+.person .who { font-weight: 600; font-size: 14px; line-height: 1.2; }
+.person .role { font-size: 12px; color: var(--ink-3); line-height: 1.3; }
+.avatar {
+  width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center;
+  font: 700 13px var(--display); color: #fff; background: var(--c);
+}
+.team-hint { font-size: 11.5px; color: var(--ink-3); margin: 2px 8px 0; }
+
+main {
+  min-width: 0;
+  background-color: var(--bg);
+  background-image:
+    linear-gradient(var(--grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+  background-size: 56px 56px;
+  padding-block: 44px 96px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px), 4vw);
+  padding-right: max(16px, env(safe-area-inset-right, 0px), 4vw);
+}
+.sheet { max-width: 1080px; margin: 0 auto; display: flex; flex-direction: column; gap: 28px; animation: rise .35s ease-out; }
+@keyframes rise { from { transform: translateY(6px); } to { transform: none; } }
+
+/* ---------- type */
+.eyebrow { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; font: 500 11.5px var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--ink-3); }
+.eyebrow .tag { display: inline-flex; align-items: center; gap: 6px; color: var(--ink-2); }
+h1 { font: 700 clamp(32px, 4.4vw, 52px)/1.02 var(--display); letter-spacing: -.03em; margin: 10px 0 14px; text-wrap: balance; max-width: 22ch; }
+h2 { font: 650 23px/1.2 var(--display); letter-spacing: -.015em; margin: 0 0 6px; text-wrap: balance; }
+h3 { font: 650 17px/1.3 var(--display); margin: 0; }
+.lede { font-size: 18px; line-height: 1.6; color: var(--ink-2); max-width: 66ch; margin: 0; }
+.lede b, p b { color: var(--ink); font-weight: 600; }
+p { margin: 0; }
+.muted { color: var(--ink-3); }
+.small { font-size: 13.5px; color: var(--ink-2); }
+.label { font: 500 10.5px var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--ink-3); }
+.num { font-variant-numeric: tabular-nums; }
+
+/* ---------- surfaces */
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 22px; box-shadow: var(--shadow); min-width: 0; }
+.panel.flat { box-shadow: none; }
+.split { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 22px; align-items: start; }
+.split.even { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+.row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.stack { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+
+.note {
+  display: grid; grid-template-columns: 22px 1fr; gap: 10px; align-items: start;
+  background: var(--wash); border-radius: 12px; padding: 13px 16px; font-size: 14.5px; color: var(--ink-2);
+}
+.note .ic { font: 600 14px var(--mono); color: var(--ink); text-align: center; line-height: 1.5; }
+
+.pill {
+  display: inline-flex; align-items: center; gap: 7px; padding: 5px 12px; border-radius: 99px;
+  font-size: 13.5px; font-weight: 600; border: 1.5px solid var(--c, var(--line)); color: var(--ink); background: var(--raised);
+}
+.pill i { font-style: normal; color: var(--c, var(--ink-3)); font-weight: 700; }
+.pill.big { font-size: 15.5px; padding: 8px 16px; }
+.dot { width: 9px; height: 9px; border-radius: 50%; background: var(--c); display: inline-block; flex: none; }
+
+.btn {
+  display: inline-flex; align-items: center; gap: 8px; padding: 10px 16px; border-radius: 10px;
+  border: 1px solid var(--line); background: var(--raised); cursor: pointer; font-weight: 600; font-size: 14.5px;
+}
+.btn.primary { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.btn:hover { border-color: var(--ink-3); }
+
+/* ---------- stage footer */
+.where { display: grid; grid-template-columns: auto 1fr; gap: 16px; align-items: center; }
+.where .avatar { width: 40px; height: 40px; font-size: 16px; }
+.pager { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.pager .btn { max-width: 100%; }
+.pager .btn small { font: 500 10.5px var(--mono); letter-spacing: .1em; color: var(--ink-3); text-transform: uppercase; }
+
+/* ---------- group picker */
+.picker { display: flex; gap: 8px; overflow-x: auto; padding: 2px 2px 6px; scrollbar-width: thin; }
+.pick {
+  flex: 1 0 168px; display: grid; grid-template-columns: 44px 1fr; gap: 10px; align-items: center; text-align: left;
+  border: 1px solid var(--line); background: var(--surface); border-radius: 12px; padding: 8px 10px 8px 8px; cursor: pointer; transition: border-color .15s, box-shadow .15s;
+}
+.pick:hover { border-color: var(--ink-3); }
+.pick[aria-pressed="true"] { border-color: var(--ink); box-shadow: inset 0 0 0 1px var(--ink), var(--shadow); background: var(--raised); }
+.pick .collage { width: 44px; height: 44px; border-radius: 9px; overflow: hidden; display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: var(--line); }
+.pick .collage img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.pick .g { font: 500 10px var(--mono); letter-spacing: .1em; color: var(--ink-3); text-transform: uppercase; }
+.pick .nm { font-size: 13.5px; font-weight: 600; line-height: 1.25; }
+
+/* ---------- photos stage */
+.mosaic { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; }
+.tile { aspect-ratio: 1; max-width: 100%; border: 0; padding: 0; border-radius: 8px; overflow: hidden; cursor: pointer; position: relative; background: var(--wash); }
+.tile img { width: 100%; height: 100%; object-fit: cover; display: block; transition: transform .25s; }
+.tile:hover img { transform: scale(1.06); }
+.tile[aria-pressed="true"] { outline: 3px solid var(--ink); outline-offset: 2px; }
+.viewer { position: relative; border-radius: 12px; overflow: hidden; background: #000; }
+.viewer img { display: block; width: 100%; }
+.viewer svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+.outline { fill: rgba(255, 255, 255, 0); stroke: #fff; stroke-width: 2.5; vector-effect: non-scaling-stroke; paint-order: stroke; transition: fill .15s; filter: drop-shadow(0 0 1.5px rgba(0, 0, 0, .9)); }
+.outline.on { fill: rgba(255, 255, 255, .35); }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { border: 1px solid var(--line); background: var(--raised); border-radius: 99px; padding: 3px 11px; font-size: 13px; cursor: default; }
+.chip.on { border-color: var(--ink); }
+.quote { font: 400 16px/1.55 var(--body); color: var(--ink-2); border-left: 3px solid var(--line); padding-left: 14px; margin: 0; }
+.stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
+.stat b { display: block; font: 700 34px/1 var(--display); letter-spacing: -.02em; }
+.stat span { font-size: 13.5px; color: var(--ink-2); }
+
+/* ---------- embed stage */
+.fp { display: grid; grid-template-columns: 64px minmax(0, 1fr); gap: 14px; align-items: center; }
+.fp img { width: 64px; height: 64px; object-fit: cover; border-radius: 8px; display: block; }
+.fp canvas { width: 100%; height: 46px; display: block; border-radius: 4px; }
+.fp .cap { display: flex; justify-content: space-between; gap: 10px; font-size: 13px; color: var(--ink-2); margin-bottom: 5px; }
+.scale-key { display: flex; align-items: center; gap: 10px; font-size: 12.5px; color: var(--ink-3); }
+.scale-key i { height: 8px; flex: 0 0 120px; border-radius: 4px; background: linear-gradient(90deg, var(--div-neg), var(--div-mid), var(--div-pos)); }
+svg.map { width: 100%; height: auto; display: block; }
+svg.map .ph { cursor: pointer; }
+
+/* ---------- text check */
+.swarm { position: relative; width: 100%; }
+.swarm .s {
+  position: absolute; width: 38px; height: 38px; margin: -19px 0 0 -19px; border-radius: 50%; overflow: hidden;
+  border: 2px solid var(--surface); transition: left .7s cubic-bezier(.2, .8, .2, 1), top .7s cubic-bezier(.2, .8, .2, 1), filter .4s, opacity .4s;
+}
+.swarm .s img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.swarm .s.out { filter: grayscale(1); opacity: .55; }
+.swarm .s.in { border-color: var(--ink); box-shadow: 0 0 0 2px var(--surface); z-index: 2; }
+.swarm .axis { position: absolute; left: 0; right: 0; bottom: 0; height: 26px; border-top: 1px solid var(--line); display: flex; justify-content: space-between; align-items: end; font-size: 12.5px; color: var(--ink-3); }
+.odds { display: grid; grid-template-columns: repeat(10, 1fr); gap: 4px; max-width: 260px; }
+.odds i { aspect-ratio: 1; border-radius: 50%; background: var(--ink); }
+.odds i.miss { background: transparent; box-shadow: inset 0 0 0 1.5px var(--ink-3); }
+.big-figure { font: 700 64px/0.95 var(--display); letter-spacing: -.04em; }
+.big-figure small { font-size: 24px; letter-spacing: -.01em; color: var(--ink-3); }
+
+/* ---------- hide stage */
+.compare { position: relative; border-radius: 14px; overflow: hidden; background: #000; user-select: none; touch-action: pan-y; }
+.compare img { display: block; width: 100%; }
+.compare .top { position: absolute; inset: 0; }
+.compare .top img { width: 100%; height: 100%; object-fit: cover; }
+.compare .bar { position: absolute; top: 0; bottom: 0; width: 2px; background: #fff; box-shadow: 0 0 0 1px rgba(0, 0, 0, .4); pointer-events: none; }
+.compare .knob { position: absolute; top: 50%; width: 38px; height: 38px; margin: -19px 0 0 -18px; border-radius: 50%; background: #fff; color: #0e1b2a; display: grid; place-items: center; font: 700 14px var(--mono); box-shadow: 0 2px 10px rgba(0, 0, 0, .4); pointer-events: none; }
+.compare .tagL, .compare .tagR { position: absolute; top: 12px; font: 600 11px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: #fff; background: rgba(0, 0, 0, .55); padding: 4px 9px; border-radius: 6px; pointer-events: none; }
+.compare .tagL { left: 12px; }
+.compare .tagR { right: 12px; }
+.compare input { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: ew-resize; margin: 0; }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; background: var(--raised); }
+.seg button { border: 0; background: none; padding: 7px 13px; font-size: 13.5px; cursor: pointer; color: var(--ink-2); display: inline-flex; align-items: center; gap: 7px; }
+.seg button[aria-pressed="true"] { background: var(--ink); color: var(--bg); }
+.plist { display: flex; flex-direction: column; gap: 6px; }
+.prow {
+  display: grid; grid-template-columns: 52px 1fr auto; gap: 12px; align-items: center; text-align: left; width: 100%;
+  border: 1px solid var(--line); background: var(--surface); border-radius: 11px; padding: 6px 12px 6px 6px; cursor: pointer;
+}
+.prow img { width: 52px; height: 52px; object-fit: cover; border-radius: 7px; display: block; }
+.prow[aria-pressed="true"] { border-color: var(--ink); box-shadow: inset 0 0 0 1px var(--ink); background: var(--raised); }
+.prow .nm { font-weight: 600; font-size: 14px; }
+.prow .sub { font-size: 12.5px; color: var(--ink-3); }
+.cov { height: 5px; border-radius: 3px; background: var(--wash); margin-top: 5px; overflow: hidden; max-width: 160px; }
+.cov i { display: block; height: 100%; background: var(--ink-2); }
+.cases { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.case { display: grid; grid-template-columns: 120px 1fr; gap: 14px; align-items: start; }
+.case img { width: 120px; height: 90px; object-fit: cover; border-radius: 9px; display: block; }
+
+/* ---------- verify */
+.compass-wrap { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 26px; align-items: center; }
+svg.compass { width: 100%; height: auto; display: block; overflow: visible; }
+.leg { display: grid; grid-template-columns: 6px 1fr; gap: 14px; padding: 4px 0; }
+.leg .bar { border-radius: 3px; background: var(--c); }
+.leg.dash .bar { background: repeating-linear-gradient(180deg, var(--c) 0 7px, transparent 7px 11px); }
+.rankline { display: flex; align-items: baseline; gap: 10px; font: 700 30px/1.1 var(--display); letter-spacing: -.02em; margin: 2px 0; }
+.rankline .arrow { color: var(--ink-3); font-weight: 400; }
+.rankline small { font: 500 13px var(--body); color: var(--ink-3); letter-spacing: 0; }
+.thumbs { display: flex; gap: 6px; flex-wrap: wrap; }
+.thumbs button { border: 0; padding: 0; background: none; cursor: pointer; border-radius: 9px; position: relative; }
+.thumbs img { width: 50px; height: 50px; object-fit: cover; border-radius: 9px; display: block; opacity: .6; transition: opacity .15s; }
+.thumbs button[aria-pressed="true"] img { opacity: 1; outline: 2.5px solid var(--ink); outline-offset: 2px; }
+.thumbs button:hover img { opacity: 1; }
+.thumbs .x { position: absolute; right: -4px; top: -4px; width: 16px; height: 16px; border-radius: 50%; background: var(--raised); border: 1px solid var(--line); font: 700 10px/14px var(--mono); text-align: center; color: var(--ink-3); }
+.board { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+.card {
+  border: 1px solid var(--line); background: var(--raised); border-radius: 12px; padding: 8px; display: flex; flex-direction: column; gap: 6px;
+  cursor: pointer; text-align: left;
+}
+.card[aria-pressed="true"] { border-color: var(--ink); box-shadow: inset 0 0 0 1px var(--ink); }
+.card.out { opacity: .55; }
+.card .top { display: grid; grid-template-columns: 44px 1fr; gap: 8px; align-items: center; }
+.card img { width: 44px; height: 44px; object-fit: cover; border-radius: 7px; display: block; }
+.card svg { width: 100%; height: 54px; display: block; }
+.card .v { font-size: 12.5px; font-weight: 600; display: flex; gap: 6px; align-items: center; }
+.meter { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.meter i { width: 18px; height: 18px; border-radius: 50%; background: var(--ink); }
+.meter i.empty { background: transparent; box-shadow: inset 0 0 0 2px var(--ink-3); }
+.coin { font: 500 13px/1.5 var(--mono); color: var(--ink-2); }
+details.raw summary { cursor: pointer; font-size: 13.5px; color: var(--ink-2); }
+table.rawt { border-collapse: collapse; font: 12.5px var(--mono); margin-top: 8px; width: 100%; }
+table.rawt td, table.rawt th { border-bottom: 1px solid var(--line); padding: 5px 8px; text-align: left; }
+table.rawt th { color: var(--ink-3); font-weight: 500; }
+
+.strip { display: grid; grid-template-columns: repeat(39, minmax(0, 1fr)); gap: 1px; width: 100%; max-width: 320px; }
+.strip i { height: 10px; border-radius: 1px; background: var(--wash); box-shadow: inset 0 0 0 1px var(--line); }
+.strip i.on { background: var(--c); box-shadow: none; }
+.test-row { display: flex; flex-direction: column; gap: 4px; }
+.mini-row { display: grid; grid-template-columns: 34px 1fr 20px; gap: 6px; align-items: center; }
+.mini-row .strip i { height: 7px; }
+.mini-row b { font-size: 12px; text-align: right; }
+.testline { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(120px, 1fr) auto; gap: 16px; align-items: center; padding: 12px 0; border-top: 1px solid var(--line); }
+.pctbar { position: relative; height: 12px; border-radius: 6px; background: var(--wash); overflow: visible; }
+.pctbar i { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 6px; background: var(--c); }
+.pctbar .mid { position: absolute; left: 50%; top: -4px; bottom: -4px; width: 2px; background: var(--ink-3); }
+.patches { display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); gap: 4px; }
+.patches img { width: 100%; aspect-ratio: 1; max-width: 100%; object-fit: cover; border-radius: 6px; display: block; }
+@media (max-width: 760px) { .testline { grid-template-columns: minmax(0, 1fr); } .patches { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+
+/* ---------- overview */
+.hero { display: grid; grid-template-columns: minmax(0, 1fr) 260px; gap: 30px; align-items: center; }
+.hero h1 { font-size: clamp(36px, 5.2vw, 64px); max-width: 16ch; }
+.story { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0; border-radius: 18px; overflow: hidden; border: 1px solid var(--line); background: var(--surface); box-shadow: var(--shadow); }
+.beat { padding: 22px; display: flex; flex-direction: column; gap: 14px; border-right: 1px solid var(--line); min-width: 0; }
+.beat:last-child { border-right: 0; }
+.beat .k { font: 700 13px var(--mono); color: var(--ink-3); }
+.beat .vis { height: 170px; display: grid; place-items: center; }
+.collage4 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; width: 100%; max-width: 230px; }
+.collage4 img { width: 100%; aspect-ratio: 1; max-width: 100%; object-fit: cover; border-radius: 7px; display: block; }
+.bubble { position: relative; background: var(--raised); border: 1px solid var(--line); border-radius: 16px; padding: 14px 16px; font: 600 18px/1.3 var(--display); max-width: 240px; box-shadow: var(--shadow); }
+.bubble::after { content: ""; position: absolute; left: 28px; bottom: -9px; width: 16px; height: 16px; background: var(--raised); border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); transform: rotate(45deg); }
+.bubble small { display: block; font: 500 10.5px var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--ink-3); margin-bottom: 4px; }
+.people-cards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+.pc { display: flex; flex-direction: column; gap: 12px; border-top: 4px solid var(--c); }
+.pc .head { display: flex; gap: 12px; align-items: center; }
+.pc .avatar { width: 42px; height: 42px; font-size: 17px; }
+.pc .stg { display: flex; flex-wrap: wrap; gap: 6px; }
+.pc .stg button { border: 1px solid var(--line); background: var(--raised); border-radius: 8px; padding: 4px 9px; font-size: 12.5px; cursor: pointer; display: inline-flex; gap: 6px; align-items: center; }
+.pc .stg button:hover { border-color: var(--ink-3); }
+.progress { display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); gap: 4px; }
+.progress .seg8 { height: 10px; border-radius: 5px; background: var(--c); }
+.progress .seg8.partial { background: repeating-linear-gradient(135deg, var(--c) 0 5px, transparent 5px 9px); box-shadow: inset 0 0 0 1.5px var(--c); }
+.progress .seg8.todo { background: transparent; box-shadow: inset 0 0 0 1.5px var(--ink-3); }
+.progress-key { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 12.5px; color: var(--ink-3); }
+
+/* ---------- verdict */
+.score { display: grid; grid-template-columns: minmax(180px, 1.3fr) repeat(3, minmax(130px, 1fr)); }
+.score > div { padding: 14px 12px; border-bottom: 1px solid var(--line); display: flex; flex-direction: column; gap: 6px; justify-content: center; min-width: 0; }
+.score .hd { font: 500 10.5px var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--ink-3); border-bottom-color: var(--ink-3); }
+.score .hd b { display: block; font: 650 15px var(--display); letter-spacing: -.01em; text-transform: none; color: var(--ink); margin-top: 2px; }
+.score .nmcell { flex-direction: row; align-items: center; gap: 12px; justify-content: flex-start; }
+.score .nmcell img { width: 46px; height: 46px; object-fit: cover; border-radius: 9px; flex: none; }
+.score .flag { font-size: 12px; color: var(--ink-2); font-weight: 600; }
+.score-scroll { overflow-x: auto; }
+.score-scroll .score { min-width: 720px; }
+.lessons { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+.lesson { display: flex; flex-direction: column; gap: 10px; }
+.lesson .k { font: 700 44px/1 var(--display); color: var(--line); letter-spacing: -.03em; }
+.todo-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 22px; list-style: none; margin: 0; padding: 0; }
+.todo-list li { display: grid; grid-template-columns: 30px 1fr; gap: 12px; align-items: center; font-size: 14.5px; }
+.todo-list .avatar { width: 30px; height: 30px; font-size: 12.5px; }
+
+/* ---------- tooltip */
+.tip { position: fixed; z-index: 50; pointer-events: none; max-width: 300px; background: var(--raised); color: var(--ink); border: 1px solid var(--line); border-radius: 10px; padding: 9px 12px; font-size: 13px; line-height: 1.45; box-shadow: var(--shadow); opacity: 0; transition: opacity .12s; }
+
+/* ---------- responsive */
+@media (max-width: 1080px) {
+  .compass-wrap, .split, .split.even { grid-template-columns: minmax(0, 1fr); }
+  .hero { grid-template-columns: minmax(0, 1fr); }
+  .hero .rose { display: none; }
+}
+@media (max-width: 900px) {
+  .app { grid-template-columns: minmax(0, 1fr); }
+  .rail {
+    position: sticky; top: env(safe-area-inset-top, 0px); z-index: 20; height: auto; flex-direction: row; align-items: center; gap: 12px;
+    border-right: 0; border-bottom: 1px solid var(--line); padding-block: 10px; overflow-x: auto; overflow-y: hidden;
+    padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  }
+  body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 30; background: var(--surface); }
+  .brand span, .rail-label, .team, .track-gfx, .intro-btn small { display: none; }
+  .brand b { font-size: 17px; }
+  .intro-btn { width: auto; white-space: nowrap; padding: 8px 12px; font-size: 13.5px; }
+  .steps { flex-direction: row; gap: 6px; }
+  .step { white-space: nowrap; padding: 8px 12px 8px 30px; }
+  .step .m { display: none; }
+  .step .t { font-size: 14px; margin: 0; }
+  .step .mk { left: 9px !important; top: 50%; margin-top: -8px; }
+  .stats, .people-cards, .lessons, .story, .cases, .todo-list { grid-template-columns: minmax(0, 1fr); }
+  .beat { border-right: 0; border-bottom: 1px solid var(--line); }
+  .beat:last-child { border-bottom: 0; }
+}
+@media (max-width: 560px) {
+  .mosaic { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .case { grid-template-columns: 1fr; }
+  .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .big-figure { font-size: 48px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="rail" aria-label="Pipeline">
+    <button class="brand" data-go="overview" aria-label="Clip Compass overview">
+      <svg width="38" height="38" viewBox="0 0 38 38" aria-hidden="true">
+        <circle cx="19" cy="19" r="17" fill="none" stroke="var(--ink)" stroke-width="1.5"/>
+        <circle cx="19" cy="19" r="12.5" fill="none" stroke="var(--line)" stroke-width="1"/>
+        <path d="M19 4 L22.5 19 L19 34 L15.5 19 Z" fill="var(--ink)" opacity=".18"/>
+        <path d="M19 4 L22.5 19 L15.5 19 Z" fill="var(--ink)"/>
+        <path d="M19 34 L22.5 19 L15.5 19 Z" fill="var(--hidden)"/>
+        <circle cx="19" cy="19" r="2.2" fill="var(--surface)" stroke="var(--ink)" stroke-width="1.2"/>
+      </svg>
+      <span><b>Clip Compass</b><span>CS 5787 · group project</span></span>
+    </button>
+    <button class="intro-btn" data-go="overview" id="introBtn">The big idea <small>Start here</small></button>
+    <div>
+      <p class="rail-label">The pipeline</p>
+      <div class="track" id="track">
+        <svg class="track-gfx" id="trackGfx" aria-hidden="true"></svg>
+        <ul class="steps" id="steps"></ul>
+      </div>
+    </div>
+    <div class="team" id="team"></div>
+  </aside>
+  <main id="view" tabindex="-1"></main>
+</div>
+<div class="tip" id="tip" role="tooltip"></div>
+
+<script>
+const DATA = /*__DATA__*/null;
+
+// ================= helpers
+const $ = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const NS = "http://www.w3.org/2000/svg";
+const svgEl = (tag, attrs = {}, parent) => {
+  const e = document.createElementNS(NS, tag);
+  for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, v);
+  if (parent) parent.appendChild(e);
+  return e;
+};
+const pct = v => Math.round(v * 100);
+const MOTION = !matchMedia("(prefers-reduced-motion: reduce)").matches;
+const cssVar = name => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+const items = DATA.items, nodes = DATA.nodes, pairs = DATA.pairs;
+const nodeById = Object.fromEntries(nodes.map(n => [n.id, n]));
+const groupNo = id => nodes.findIndex(n => n.id === id) + 1;
+const pairsOf = id => pairs.filter(p => p.node === id);
+const objName = p => p.objects.join(" + ");
+const plural = (n, w, ws) => `${n} ${n === 1 ? w : (ws || w + "s")}`;
+
+const K = DATA.engine.controls;
+const testable = p => p.status === "testable";
+const median = xs => { const s = xs.slice().sort((a, b) => a - b), m = s.length >> 1; return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2; };
+function pairInfo(p) {
+  const node = nodeById[p.node];
+  const m0 = node.matches[p.item];
+  const rank = v => 1 + node.matches.filter((m, j) => j !== p.item && m > v).length;
+  if (!testable(p)) return { node, m0, rO: rank(m0) };
+  const mC = median(p.controls.map(c => c.m));
+  return { node, m0, mC, rO: rank(m0), rT: rank(p.target.match), rC: rank(mC), idea: p.ranks.prompt, group: p.ranks.centroid };
+}
+// what each skipped status means, in plain words
+const SKIP = {
+  absent: { short: "Not in photo", long: o => `This photo has no ${o}, so there's nothing to hide.` },
+  too_small_in_crop: { short: "Too small", long: o => `The ${o} covers under ${pct(DATA.engine.min_visible_fraction)}% of what CLIP sees, too little to matter.` },
+  no_control_room: { short: "Too big", long: o => `The ${o} fills so much of what CLIP sees that ${K} same-shaped random patches can't fit without overlapping it.` },
+};
+const LABEL = {
+  supported: { icon: "✓", text: "Supported", c: "var(--good)", long: "Hiding the object pushes photos out of their group: it explains the group." },
+  detected_not_explanatory: { icon: "◐", text: "Detected, not defining", c: "var(--dhruv)", long: "CLIP notices the object, but hiding it doesn't push photos out of the group." },
+  not_supported: { icon: "✕", text: "Not supported", c: "var(--bad)", long: "The object doesn't explain the group." },
+  insufficient_evidence: { icon: "⧖", text: "Not enough photos", c: "var(--ink-3)", long: "Too few photos could be tested to decide." },
+  untestable: { icon: "–", text: "Can't be tested", c: "var(--ink-3)", long: "The guess names something COCO doesn't outline." },
+};
+const REASON = {
+  low_coverage: v => `Only ${v.visible} of ${v.members} photos in the group visibly contain it, so it can't be what defines the group.`,
+  no_effect: () => "Hiding it didn't beat the random patches by more than luck allows, on either test.",
+  too_few_testable_members: v => `Only ${v.testable} photo could be tested; the test needs at least ${DATA.verdictConfig.min_testable}.`,
+  unknown_categories: () => "It names an object COCO doesn't outline.",
+};
+const verdictPill = (v, big) => { const d = LABEL[v] || LABEL.insufficient_evidence; return `<span class="pill${big ? " big" : ""}" style="--c:${d.c}"><i>${d.icon}</i>${d.text}</span>`; };
+const luck = q => q == null ? "–" : q <= 0.0005 ? "under 1 in 2,000" : `about 1 in ${Math.max(1, Math.round(1 / q)).toLocaleString()}`;
+const strip = (n, c) => `<span class="strip" style="--c:${c}" aria-label="beat ${n} of ${K}">${Array.from({ length: K }, (_, j) => `<i class="${j < n ? "on" : ""}"></i>`).join("")}</span>`;
+
+// clearest example in the run: the tested photo whose object beat the most random patches overall
+const BEST = pairs.filter(testable).sort((a, b) => (b.ranks.centroid + b.ranks.prompt) - (a.ranks.centroid + a.ranks.prompt))[0] || pairs[0];
+
+// ================= people and stages
+const PEOPLE = {
+  gayatri: { name: "Gayatri", c: "var(--gayatri)", role: "Embeddings, groups and the AI agent" },
+  dhruv: { name: "Dhruv", c: "var(--dhruv)", role: "Masking engine and per-photo scores" },
+  joe: { name: "Joe", c: "var(--joe)", role: "Verdict test and the text check" },
+  team: { name: "Everyone", c: "var(--team)", role: "Write-up" },
+};
+const STATUS = {
+  done: { text: "Done", seg: "done" },
+  test: { text: "Built · test data", seg: "partial" },
+  progress: { text: "In progress", seg: "partial" },
+  first: { text: "First results · test data", seg: "partial" },
+  todo: { text: "To do", seg: "todo" },
+};
+const STAGES = [
+  { id: "photos", n: 1, title: "Photos", owner: "gayatri", status: "done", lane: 0 },
+  { id: "embed", n: 2, title: "Embed with CLIP", owner: "gayatri", status: "done", lane: 0 },
+  { id: "groups", n: 3, title: "Find groups", owner: "gayatri", status: "done", lane: 0 },
+  { id: "guess", n: 4, title: "AI guesses why", owner: "gayatri", status: "test", lane: 0 },
+  { id: "text-check", n: 5, title: "Quick text check", owner: "joe", status: "done", lane: 1 },
+  { id: "hide", n: 6, title: "Hide the object", owner: "dhruv", status: "done", lane: 0 },
+  { id: "verify", n: 7, title: "Verify", owner: "joe", status: "test", lane: 0 },
+  { id: "verdict", n: 8, title: "Verdict", owner: "team", status: "first", lane: 0 },
+];
+const stageById = Object.fromEntries(STAGES.map(s => [s.id, s]));
+const state = { stage: "overview", node: BEST.node, photo: BEST.item, pair: BEST.id, edit: "target", person: null };
+
+function markerSvg(owner, status, size = 16) {
+  const c = PEOPLE[owner].c, r = size / 2 - 1.5, m = size / 2;
+  const seg = STATUS[status].seg;
+  if (seg === "done") return `<svg class="marker" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}"><circle cx="${m}" cy="${m}" r="${r}" fill="${c}" stroke="var(--surface)" stroke-width="2"/></svg>`;
+  if (seg === "todo") return `<svg class="marker" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}"><circle cx="${m}" cy="${m}" r="${r - .5}" fill="var(--surface)" stroke="${c}" stroke-width="1.8" stroke-dasharray="2.6 2.2"/></svg>`;
+  return `<svg class="marker" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}"><circle cx="${m}" cy="${m}" r="${r - .5}" fill="var(--surface)" stroke="${c}" stroke-width="2"/><path d="M${m} ${m - r + 2.5} A${r - 2.5} ${r - 2.5} 0 0 1 ${m} ${m + r - 2.5} Z" fill="${c}"/></svg>`;
+}
+const ownerTag = s => `<span class="tag"><span class="dot" style="--c:${PEOPLE[s.owner].c}"></span>${PEOPLE[s.owner].name}</span>`;
+
+// ================= rail
+function renderRail() {
+  $("#steps").innerHTML = STAGES.map(s => `
+    <li><button class="step${state.person && s.owner !== state.person ? " dim" : ""}" data-go="${s.id}" ${state.stage === s.id ? 'aria-current="page"' : ""}>
+      <span class="mk" style="left:${s.lane ? 32 : 12}px">${markerSvg(s.owner, s.status)}</span>
+      <span class="n">${String(s.n).padStart(2, "0")}</span>
+      <span class="t">${s.title}</span>
+      <span class="m"><span class="dot" style="--c:${PEOPLE[s.owner].c}"></span>${PEOPLE[s.owner].name} · ${STATUS[s.status].text}</span>
+    </button></li>`).join("");
+  $("#introBtn").toggleAttribute("aria-current", state.stage === "overview");
+  if (state.stage === "overview") $("#introBtn").setAttribute("aria-current", "page");
+  $("#team").innerHTML = Object.entries(PEOPLE).filter(([k]) => k !== "team").map(([k, p]) => `
+    <button class="person" data-person="${k}" aria-pressed="${state.person === k}">
+      <span class="avatar" style="--c:${p.c}">${p.name[0]}</span>
+      <span><span class="who">${p.name}</span><br><span class="role">${p.role}</span></span>
+    </button>`).join("") + `<p class="team-hint">${state.person ? "Showing " + PEOPLE[state.person].name + "'s stages. Click again to show everyone." : "Click a name to see their stages."}</p>`;
+  drawTrack();
+}
+
+function drawTrack() {
+  const gfx = $("#trackGfx"), track = $("#track");
+  if (!gfx || getComputedStyle(gfx).display === "none") return;
+  const box = track.getBoundingClientRect();
+  const pos = {};
+  $$("#steps .step").forEach(b => {
+    const m = b.querySelector(".marker").getBoundingClientRect();
+    pos[b.dataset.go] = [m.left - box.left + m.width / 2, m.top - box.top + m.height / 2];
+  });
+  gfx.setAttribute("viewBox", `0 0 ${box.width} ${box.height}`);
+  gfx.innerHTML = "";
+  const order = STAGES.filter(s => !s.lane).map(s => pos[s.id]);
+  const x1 = order[0][0];
+  svgEl("line", { x1, x2: x1, y1: order[0][1], y2: order.at(-1)[1], stroke: "var(--line)", "stroke-width": 2 }, gfx);
+  const g = pos.guess, t = pos["text-check"], v = pos.verdict;
+  const x2 = t[0];
+  svgEl("path", { d: `M${x1} ${g[1] + 8} C ${x1} ${g[1] + 22}, ${x2} ${g[1] + 16}, ${x2} ${t[1] - 12} L ${x2} ${v[1] - 22} C ${x2} ${v[1] - 10}, ${x1} ${v[1] - 14}, ${x1} ${v[1] - 8}`, fill: "none", stroke: "var(--line)", "stroke-width": 2, "stroke-dasharray": "4 4" }, gfx);
+}
+
+// ================= shared components
+function picker() {
+  return `<div class="picker" role="group" aria-label="Choose a group">${nodes.map((n, k) => `
+    <button class="pick" data-node="${n.id}" aria-pressed="${state.node === n.id}">
+      <span class="collage">${n.members.slice(0, 4).map(i => `<img src="${items[i].thumb}" alt="">`).join("")}</span>
+      <span><span class="g">Group ${k + 1}</span><br><span class="nm">${esc(state.stage === "groups" ? plural(n.members.length, "photo") : n.name)}</span></span>
+    </button>`).join("")}</div>`;
+}
+function head(s, title, lede) {
+  return `<header>
+    <div class="eyebrow"><span>Step ${String(s.n).padStart(2, "0")} of 08</span>${ownerTag(s)}<span class="tag">${markerSvg(s.owner, s.status, 13).replace('class="marker"', "")}${STATUS[s.status].text}</span></div>
+    <h1>${title}</h1>
+    <p class="lede">${lede}</p>
+  </header>`;
+}
+function footer(s, where) {
+  const i = STAGES.indexOf(s), prev = STAGES[i - 1], next = STAGES[i + 1];
+  const p = PEOPLE[s.owner];
+  return `<div class="panel flat where">
+      <span class="avatar" style="--c:${p.c}">${p.name[0]}</span>
+      <div><div class="label">Where it stands · ${p.name}</div><p class="small" style="margin-top:3px">${where}</p></div>
+    </div>
+    <nav class="pager">
+      ${prev ? `<button class="btn" data-go="${prev.id}">← <span><small>Step ${prev.n}</small><br>${prev.title}</span></button>` : `<button class="btn" data-go="overview">← <span><small>Start</small><br>The big idea</span></button>`}
+      ${next ? `<button class="btn primary" data-go="${next.id}"><span><small style="color:inherit;opacity:.7">Step ${next.n}</small><br>${next.title}</span> →</button>` : `<button class="btn primary" data-go="overview"><span><small style="color:inherit;opacity:.7">Back to</small><br>The big idea</span> →</button>`}
+    </nav>`;
+}
+
+// ================= compass
+// North = the photo matches the hypothesis sentence more, south = less; east/west =
+// changes unrelated to the sentence. The object edit is drawn east, the random
+// patches as a cloud to the west. A dashed line marks the object's height: every
+// patch dot above it lost less of the idea than hiding the object did.
+let compassStretch = 1;
+function drawCompass(svg, nodeId, pairId, opts = {}) {
+  const mini = !!opts.mini;
+  const S = mini ? 260 : 460, C = S / 2, R = mini ? 104 : 168;
+  svg.innerHTML = "";
+  svg.setAttribute("viewBox", mini ? `0 0 ${S} ${S}` : `-46 -6 ${S + 92} ${S + 12}`);
+  // East-west and north-south get their own scales (shared by every photo in the group),
+  // because the shift along one idea is tiny next to everything else an edit changes.
+  const group = pairsOf(nodeId).filter(testable);
+  const points = group.flatMap(q => [{ s: q.target.sideways, a: q.target.along }, ...q.controls]);
+  const maxLen = R - (mini ? 16 : 26);
+  const kx = .72 * maxLen / Math.max(...points.map(e => e.s), 1e-6);
+  const ky = .68 * maxLen / Math.max(...points.map(e => Math.abs(e.a)), 1e-6);
+  compassStretch = Math.max(1, Math.round(ky / kx));
+  const p = pairs.find(q => q.id === pairId);
+  const place = (side, sideways, along) => {
+    let x = C + side * sideways * kx, y = C - along * ky;
+    const raw = Math.hypot(x - C, y - C);
+    if (raw > maxLen) { x = C + (x - C) * maxLen / raw; y = C + (y - C) * maxLen / raw; }
+    return [x, y];
+  };
+
+  svgEl("circle", { cx: C, cy: C, r: R, fill: "var(--raised)", stroke: "var(--line)", "stroke-width": 1.5 }, svg);
+  for (const f of [.33, .66]) svgEl("circle", { cx: C, cy: C, r: R * f, fill: "none", stroke: "var(--grid)", "stroke-width": 1 }, svg);
+  for (let a = 0; a < 360; a += 5) {
+    const long = a % 90 === 0, mid = a % 30 === 0;
+    const r0 = R - (long ? 12 : mid ? 8 : 4), rad = a * Math.PI / 180;
+    svgEl("line", { x1: C + R * Math.sin(rad), y1: C - R * Math.cos(rad), x2: C + r0 * Math.sin(rad), y2: C - r0 * Math.cos(rad), stroke: long ? "var(--ink-2)" : "var(--ink-3)", "stroke-width": long ? 1.6 : 1, opacity: long ? 1 : .6 }, svg);
+  }
+  svgEl("line", { x1: C, y1: C - R + 14, x2: C, y2: C + R - 14, stroke: "var(--ink-3)", "stroke-width": 1, "stroke-dasharray": "2 4" }, svg);
+  const lab = (x, y, t, anchor, size = 11, weight = 500, fill = "var(--ink-3)") => { const e = svgEl("text", { x, y, "text-anchor": anchor, "font-family": "var(--mono)", "font-size": size, "font-weight": weight, fill, "letter-spacing": ".08em" }, svg); e.textContent = t; return e; };
+  if (!mini) {
+    lab(C, C - R - 12, "N · MORE OF THE IDEA", "middle", 11, 600, "var(--ink)");
+    lab(C, C + R + 22, "S · LESS OF THE IDEA", "middle", 11, 600, "var(--ink)");
+    lab(C + R + 8, C - 6, "OBJECT", "start", 10, 600, "var(--ink-2)");
+    lab(C + R + 8, C + 8, "HIDDEN", "start", 10, 600, "var(--ink-2)");
+    lab(C - R - 8, C - 6, `${K} RANDOM`, "end", 10, 600, "var(--ink-2)");
+    lab(C - R - 8, C + 8, "PATCHES", "end", 10, 600, "var(--ink-2)");
+  }
+  const defs = svgEl("defs", {}, svg);
+  const cid = `cc${mini ? "m" : ""}`;
+  const clip = svgEl("clipPath", { id: cid, clipPathUnits: "objectBoundingBox" }, defs);
+  svgEl("circle", { cx: .5, cy: .5, r: .5 }, clip);
+  const m = svgEl("marker", { id: `ah${mini ? "m" : ""}`, viewBox: "0 0 10 10", refX: 5, refY: 5, markerWidth: 5, markerHeight: 5, orient: "auto" }, defs);
+  svgEl("path", { d: "M0,0 L10,5 L0,10 z", fill: "var(--hidden)" }, m);
+  const center = mini ? 24 : 36, tipR = mini ? 20 : 30;
+  if (p && testable(p)) {
+    const [tx, ty] = place(1, p.target.sideways, p.target.along);
+    // the object's height, across the whole dial
+    const half = Math.sqrt(Math.max(R * R - (ty - C) ** 2, 0)) - 6;
+    svgEl("line", { x1: C - half, x2: C + half, y1: ty, y2: ty, stroke: "var(--hidden)", "stroke-width": 1.5, "stroke-dasharray": "5 5", opacity: .9 }, svg);
+    const cloud = svgEl("g", {}, svg);
+    p.controls.forEach((c, j) => {
+      const [x, y] = place(-1, c.s, c.a);
+      const beaten = c.a > p.target.along;
+      const dot = svgEl("circle", { cx: x, cy: y, r: mini ? 3.4 : 5, fill: beaten ? "var(--patch)" : "var(--raised)", stroke: "var(--patch)", "stroke-width": 1.6, opacity: beaten ? .75 : 1 }, cloud);
+      if (MOTION) dot.animate([{ transform: `translate(${C - x}px,${C - y}px)`, opacity: 0 }, { transform: "translate(0,0)", opacity: 1 }], { duration: 500 + j * 12, easing: "cubic-bezier(.2,.8,.2,1)" });
+    });
+    const len = Math.hypot(tx - C, ty - C), ux = (tx - C) / (len || 1), uy = (ty - C) / (len || 1);
+    if (len > center + tipR + 6) {
+      const sx = C + ux * (center + 2), sy = C + uy * (center + 2), ex = tx - ux * (tipR + 4), ey = ty - uy * (tipR + 4);
+      const line = svgEl("line", { x1: sx, y1: sy, x2: ex, y2: ey, stroke: "var(--hidden)", "stroke-width": mini ? 3 : 4, "stroke-linecap": "round", "marker-end": `url(#ah${mini ? "m" : ""})` }, svg);
+      if (MOTION) { const L = Math.hypot(ex - sx, ey - sy); line.animate([{ strokeDasharray: `${L}`, strokeDashoffset: L }, { strokeDasharray: `${L}`, strokeDashoffset: 0 }], { duration: 700, easing: "cubic-bezier(.2,.8,.2,1)" }); }
+    }
+    const g = svgEl("g", { transform: `translate(${tx},${ty})` }, svg);
+    if (MOTION) g.animate([{ transform: `translate(${C}px,${C}px) scale(.4)` }, { transform: `translate(${tx}px,${ty}px) scale(1)` }], { duration: 700, easing: "cubic-bezier(.2,.8,.2,1)" });
+    svgEl("image", { href: p.target.img, x: -tipR, y: -tipR, width: 2 * tipR, height: 2 * tipR, "clip-path": `url(#${cid})`, preserveAspectRatio: "xMidYMid slice" }, g);
+    svgEl("circle", { r: tipR, fill: "none", stroke: "var(--hidden)", "stroke-width": 3.5 }, g);
+  }
+  const g0 = svgEl("g", { transform: `translate(${C},${C})` }, svg);
+  svgEl("circle", { r: center + 4, fill: "var(--raised)" }, g0);
+  if (p) svgEl("image", { href: items[p.item].thumb, x: -center, y: -center, width: 2 * center, height: 2 * center, "clip-path": `url(#${cid})`, preserveAspectRatio: "xMidYMid slice" }, g0);
+  svgEl("circle", { r: center, fill: "none", stroke: "var(--ink)", "stroke-width": 2.5 }, g0);
+}
+
+// ================= views
+const VIEWS = {};
+
+VIEWS.overview = {
+  html() {
+    const p = BEST, n = nodeById[p.node];
+    const textPass = nodes.filter(x => x.baseline && x.baseline.accepted).length;
+    const count = label => nodes.filter(x => x.verdict && x.verdict.label === label).length;
+    const running = STAGES.filter(s => s.status !== "todo" && s.status !== "progress").length;
+    const peopleCards = ["gayatri", "dhruv", "joe"].map(k => {
+      const pp = PEOPLE[k], mine = STAGES.filter(s => s.owner === k);
+      const line = {
+        gayatri: "Built the first half of the pipeline: the photo set, CLIP embeddings, the groups and the AI agent that explains them.",
+        dhruv: `Built the masking engine. For every photo it hides the object, plus ${K} random patches of the same shape, only inside the part of the photo CLIP sees, and scores how far each edit moved the photo.`,
+        joe: "Built the verdict test that combines every photo's score into one verdict per guess, and the quick text check it's compared against.",
+      }[k];
+      return `<div class="panel pc" style="--c:${pp.c}">
+        <div class="head"><span class="avatar" style="--c:${pp.c}">${pp.name[0]}</span><div><h3>${pp.name}</h3><div class="small">${pp.role}</div></div></div>
+        <p class="small">${line}</p>
+        <div class="stg">${mine.map(s => `<button data-go="${s.id}">${markerSvg(s.owner, s.status, 12).replace('class="marker"', "")}${s.n} · ${s.title}</button>`).join("")}</div>
+      </div>`;
+    }).join("");
+    return `<div class="sheet">
+      <section class="hero">
+        <div>
+          <div class="eyebrow"><span>Gayatri · Dhruv · Joe</span><span>Cornell CS 5787</span></div>
+          <h1>Can an AI explain what CLIP sees, and can we prove it?</h1>
+          <p class="lede">CLIP turns every photo into a point in space, and similar photos land near each other. We find groups of nearby photos and ask an AI what each group has in common. Then we <b>test the AI's answer the hard way</b>: hide that thing in the photos and check whether that changes CLIP's view more than hiding random patches does.</p>
+        </div>
+        <svg class="rose" viewBox="0 0 260 260" aria-hidden="true" id="heroRose"></svg>
+      </section>
+
+      <section class="story" aria-label="The idea in three steps">
+        <div class="beat">
+          <span class="k">1 · CLIP GROUPS PHOTOS</span>
+          <div class="vis"><div class="collage4">${n.members.slice(0, 6).map(i => `<img src="${items[i].thumb}" alt="">`).join("")}</div></div>
+          <p class="small">CLIP reads every photo. Mapper finds groups of photos CLIP thinks are alike, like this group of ${n.members.length}.</p>
+        </div>
+        <div class="beat">
+          <span class="k">2 · AN AI EXPLAINS THE GROUP</span>
+          <div class="vis"><div class="bubble"><small>The AI's guess</small>"${esc(n.prompt.replace(/^a photo of /, ""))}"</div></div>
+          <p class="small">An AI looks at the group and guesses what ties it together. Guesses can sound convincing and still be wrong.</p>
+        </div>
+        <div class="beat">
+          <span class="k">3 · WE HIDE IT AND CHECK</span>
+          <div class="vis"><svg id="storyCompass" viewBox="0 0 260 260" style="height:170px;width:auto"></svg></div>
+          <p class="small">Hide the ${esc(objName(p))} (orange), then hide ${K} random patches of the same shape (blue dots). Hiding the ${esc(objName(p))} cost CLIP more of the idea than <b>${p.ranks.prompt} of the ${K}</b> random patches did.</p>
+        </div>
+      </section>
+
+      <section class="stack">
+        <h2>Who's doing what</h2>
+        <div class="people-cards">${peopleCards}</div>
+      </section>
+
+      <section class="panel stack">
+        <div class="row" style="justify-content:space-between"><h2 style="margin:0">Pipeline progress</h2><span class="label">${running} of 8 running</span></div>
+        <div class="progress">${STAGES.map(s => `<span class="seg8 ${STATUS[s.status].seg}" style="--c:${PEOPLE[s.owner].c}" title="${s.n}. ${s.title}: ${STATUS[s.status].text}"></span>`).join("")}</div>
+        <div class="progress-key">${STAGES.map(s => `<span>${s.n}. ${s.title}</span>`).join("")}</div>
+        <p class="small muted">Every stage now runs end to end. Two still use stand-ins: hand-written guesses instead of the real AI agent, and 25 photos instead of a few hundred.</p>
+      </section>
+
+      <section class="panel stack" style="border-color:var(--ink)">
+        <div class="label">The result so far · 25 photos, test guesses</div>
+        <h2>The quick text check accepted all ${textPass} guesses. The masking test supports ${count("supported")}.</h2>
+        <p class="small">${count("supported") ? "Hiding the broccoli pushed photos out of their group more than random patches did, consistently across photos. " : ""}${count("not_supported")} guesses were not supported, mostly because the object they name isn't visible in most of the group's photos. These are hand-written test guesses on 25 photos, so this shows the method works, not a finding.</p>
+        <div class="row"><button class="btn primary" data-go="photos">Walk through the pipeline →</button><button class="btn" data-go="verdict">Jump to the verdict</button></div>
+      </section>
+    </div>`;
+  },
+  mount() {
+    drawCompass($("#storyCompass"), BEST.node, BEST.id, { mini: true });
+    const rose = $("#heroRose");
+    if (rose) {
+      const C = 130;
+      for (const r of [124, 96, 60]) svgEl("circle", { cx: C, cy: C, r, fill: "none", stroke: "var(--line)", "stroke-width": r === 124 ? 1.5 : 1 }, rose);
+      for (let a = 0; a < 360; a += 10) { const rad = a * Math.PI / 180, l = a % 90 === 0 ? 16 : 7; svgEl("line", { x1: C + 124 * Math.sin(rad), y1: C - 124 * Math.cos(rad), x2: C + (124 - l) * Math.sin(rad), y2: C - (124 - l) * Math.cos(rad), stroke: "var(--ink-3)", "stroke-width": 1 }, rose); }
+      const needle = svgEl("g", {}, rose);
+      svgEl("path", { d: `M${C} ${C - 92} L${C + 11} ${C} L${C - 11} ${C} Z`, fill: "var(--ink)" }, needle);
+      svgEl("path", { d: `M${C} ${C + 92} L${C + 11} ${C} L${C - 11} ${C} Z`, fill: "var(--hidden)" }, needle);
+      svgEl("circle", { cx: C, cy: C, r: 6, fill: "var(--surface)", stroke: "var(--ink)", "stroke-width": 2 }, rose);
+      needle.style.transformOrigin = "130px 130px";
+      if (MOTION) needle.animate([{ transform: "rotate(-28deg)" }, { transform: "rotate(14deg)" }, { transform: "rotate(-6deg)" }, { transform: "rotate(0deg)" }], { duration: 1800, easing: "ease-out" });
+    }
+  },
+};
+
+VIEWS.photos = {
+  html() {
+    const s = stageById.photos, st = DATA.stats;
+    return `<div class="sheet">
+      ${head(s, "It starts with 25 ordinary photos", `Each photo comes from <b>COCO</b>, a public dataset where people traced the outline of every object and described each scene in their own words. Those outlines matter later: they tell us <b>exactly which pixels to hide</b>.`)}
+      <div class="stats">
+        <div class="stat"><b class="num">${st.photos}</b><span>photos in this test run</span></div>
+        <div class="stat"><b class="num">${st.objects}</b><span>objects outlined by hand</span></div>
+        <div class="stat"><b class="num">${st.kinds}</b><span>kinds of object, from ${st.topKinds.slice(0, 3).map(k => k[0]).join(", ")} to ${st.topKinds.at(-1)[0]}</span></div>
+        <div class="stat"><b class="num">${st.captions}</b><span>written descriptions</span></div>
+      </div>
+      <div class="split">
+        <div class="panel stack">
+          <div class="row" style="justify-content:space-between"><h3>Pick a photo</h3><span class="label">Click to inspect</span></div>
+          <div class="mosaic">${items.map((it, i) => `<button class="tile" data-photo="${i}" aria-pressed="${state.photo === i}" aria-label="Photo ${it.id}"><img src="${it.thumb}" alt=""></button>`).join("")}</div>
+        </div>
+        <div class="panel stack" id="inspector"></div>
+      </div>
+      ${footer(s, "Done. The test run uses the first 25 photos from COCO's validation set. The real run will use a few hundred.")}
+    </div>`;
+  },
+  mount() { this.inspect(); },
+  inspect() {
+    const it = items[state.photo];
+    const polys = it.objects.map((o, j) => o.poly.map(pl => `<polygon class="outline" data-obj="${j}" points="${pl.join(" ")}"/>`).join("")).join("");
+    const counts = {};
+    it.objects.forEach(o => counts[o.name] = (counts[o.name] || 0) + 1);
+    $("#inspector").innerHTML = `
+      <div class="viewer"><img src="${it.img}" alt="Photo ${it.id}"><svg viewBox="0 0 ${it.w} ${it.h}" preserveAspectRatio="none">${polys}</svg></div>
+      <div class="label">${plural(it.objects.length, "object")} outlined · hover a name</div>
+      <div class="chips">${Object.entries(counts).map(([nm, c]) => `<span class="chip" data-name="${esc(nm)}">${esc(nm)}${c > 1 ? " ×" + c : ""}</span>`).join("")}</div>
+      <div class="label" style="margin-top:4px">How a person described it</div>
+      <blockquote class="quote">${esc(it.captions[0])}</blockquote>`;
+    $$("#inspector .chip").forEach(ch => {
+      const hit = on => it.objects.forEach((o, j) => { if (o.name === ch.dataset.name) $$(`#inspector [data-obj="${j}"]`).forEach(pg => pg.classList.toggle("on", on)); });
+      ch.onmouseenter = () => { ch.classList.add("on"); hit(true); };
+      ch.onmouseleave = () => { ch.classList.remove("on"); hit(false); };
+    });
+    $$("#inspector .outline").forEach(pg => {
+      const o = it.objects[+pg.dataset.obj];
+      pg.onmouseenter = e => { $$(`#inspector [data-obj="${pg.dataset.obj}"]`).forEach(x => x.classList.add("on")); showTip(e, `<b>${esc(o.name)}</b>`); };
+      pg.onmousemove = e => showTip(e, `<b>${esc(o.name)}</b>`);
+      pg.onmouseleave = () => { $$(`#inspector [data-obj="${pg.dataset.obj}"]`).forEach(x => x.classList.remove("on")); hideTip(); };
+    });
+  },
+  click(t) {
+    if (t.dataset.photo !== undefined) {
+      state.photo = +t.dataset.photo;
+      $$(".tile").forEach(b => b.setAttribute("aria-pressed", b === t));
+      this.inspect();
+      return true;
+    }
+  },
+};
+
+VIEWS.embed = {
+  html() {
+    const s = stageById.embed;
+    return `<div class="sheet">
+      ${head(s, "CLIP turns every photo into 512 numbers", `Think of those numbers as an <b>address</b>. CLIP learned from hundreds of millions of photos and captions to give similar-looking scenes similar addresses. So "how alike are these two photos?" becomes something we can measure: <b>how close are their addresses?</b>`)}
+      <div class="panel stack">
+        <div class="row" style="justify-content:space-between">
+          <h2 style="margin:0">Three photos, three addresses</h2>
+          <span class="scale-key">low<i></i>high</span>
+        </div>
+        <p class="small">Each block shows how a photo's numbers differ from the average photo (16 numbers per block). Blocks are sorted by the first photo, so its row sweeps from below average (blue) to above (red). The other rows keep that order: the most similar photo roughly follows the same sweep, and the least similar one tends to run the other way. Click any photo on the map below to compare it.</p>
+        <div class="stack" id="fps"></div>
+      </div>
+      <div class="panel stack">
+        <div class="row" style="justify-content:space-between"><h2 style="margin:0">Every photo, placed by its address</h2><span class="label">Click a photo</span></div>
+        <svg class="map" id="embedMap" role="img" aria-label="Map of the photos by CLIP address"></svg>
+        <p class="small muted">The real space has 512 directions, so this flat map is a squashed view that keeps about ${pct(DATA.varianceKept)}% of the spread. Close here roughly means close to CLIP. The solid line joins the selected photo to its most similar neighbour; the dashed line to its least similar.</p>
+      </div>
+      ${footer(s, "Done for every photo, using CLIP ViT-B/32. The same model re-reads the edited photos later in step 6.")}
+    </div>`;
+  },
+  mount() { this.draw(); window.addEventListener("resize", this._r = () => this.fps()); },
+  unmount() { window.removeEventListener("resize", this._r); },
+  draw() { this.fps(); this.map(); },
+  fps() {
+    const it = items[state.photo];
+    const rows = [["This photo", state.photo], ["Most similar photo", it.nearest], ["Least similar photo", it.farthest]];
+    $("#fps").innerHTML = rows.map(([lab, i], r) => `
+      <div class="fp"><img src="${items[i].thumb}" alt="">
+        <div><div class="cap"><span><b>${lab}</b></span><span class="muted">${r === 0 ? "" : r === 1 ? "closest address of all " + items.length : "furthest address"}</span></div><canvas data-i="${i}"></canvas></div>
+      </div>`).join("");
+    const neg = hexRgb(cssVar("--div-neg")), mid = hexRgb(cssVar("--div-mid")), pos = hexRgb(cssVar("--div-pos"));
+    // order the 512 stripes by this photo's own values; the same order is applied to the other two
+    // every CLIP photo shares a common baseline, so compare each photo's difference from the average photo
+    const AVG = this._avg || (this._avg = items[0].vec.map((_, j) => items.reduce((s, it) => s + it.vec[j], 0) / items.length));
+    const centred = i => items[i].vec.map((x, j) => x - AVG[j]);
+    const base = centred(state.photo), order = base.map((_, j) => j).sort((a, b) => base[a] - base[b]);
+    // average each run of 16 sorted numbers into one block, so the trend shows through the noise
+    const BINS = 32, per = order.length / BINS;
+    const binned = i => { const raw = centred(i); return Array.from({ length: BINS }, (_, b) => { let s = 0; for (let j = b * per; j < (b + 1) * per; j++) s += raw[order[j]]; return s / per; }); };
+    $$("#fps canvas").forEach(cv => {
+      const v = binned(+cv.dataset.i), w = cv.clientWidth || 600;
+      const sorted = v.map(Math.abs).sort((a, b) => a - b), scale = sorted[Math.floor(BINS * .85)] || 1;
+      cv.width = Math.round(w * devicePixelRatio); cv.height = Math.round(46 * devicePixelRatio);
+      const ctx = cv.getContext("2d"), gap = 2 * devicePixelRatio, bw = (cv.width - gap * (BINS - 1)) / BINS;
+      ctx.clearRect(0, 0, cv.width, cv.height);
+      v.forEach((x, j) => {
+        const t = Math.max(-1, Math.min(1, x / scale));
+        const to = t < 0 ? neg : pos, a = Math.abs(t);
+        ctx.fillStyle = `rgb(${mid.map((m, q) => Math.round(m + (to[q] - m) * a)).join(",")})`;
+        ctx.fillRect(j * (bw + gap), 0, bw, cv.height);
+      });
+    });
+  },
+  map() {
+    const svg = $("#embedMap"); svg.innerHTML = "";
+    const W = 900, H = 460, pad = 40;
+    const { px } = fitXY(items.map(i => i.xy), W, H, pad);
+    svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+    const sel = state.photo, it = items[sel];
+    const defs = svgEl("defs", {}, svg);
+    const clip = svgEl("clipPath", { id: "ec", clipPathUnits: "objectBoundingBox" }, defs);
+    svgEl("circle", { cx: .5, cy: .5, r: .5 }, clip);
+    const a = px(it.xy);
+    for (const [j, dash] of [[it.nearest, "none"], [it.farthest, "6 6"]]) {
+      const b = px(items[j].xy);
+      svgEl("line", { x1: a[0], y1: a[1], x2: b[0], y2: b[1], stroke: "var(--ink)", "stroke-width": 2, "stroke-dasharray": dash, opacity: .7 }, svg);
+    }
+    items.forEach((p, i) => {
+      const [x, y] = px(p.xy), r = i === sel ? 30 : 21;
+      const g = svgEl("g", { class: "ph", transform: `translate(${x},${y})`, "data-photo": i, tabindex: 0, role: "button", "aria-label": `Photo ${p.id}` }, svg);
+      svgEl("image", { href: p.thumb, x: -r, y: -r, width: 2 * r, height: 2 * r, "clip-path": "url(#ec)", preserveAspectRatio: "xMidYMid slice" }, g);
+      svgEl("circle", { r, fill: "none", stroke: i === sel ? "var(--ink)" : "var(--surface)", "stroke-width": i === sel ? 3.5 : 2.5 }, g);
+    });
+    const selG = svg.querySelector(`[data-photo="${sel}"]`); svg.appendChild(selG);
+  },
+  click(t) {
+    const g = t.closest("[data-photo]");
+    if (g) { state.photo = +g.dataset.photo; this.draw(); return true; }
+  },
+};
+
+VIEWS.groups = {
+  html() {
+    const s = stageById.groups;
+    return `<div class="sheet">
+      ${head(s, "Mapper finds neighbourhoods of similar photos", `Mapper slides a window across the cloud of addresses, clusters the photos inside each window, and <b>joins clusters that share photos</b>. Each cluster becomes a group. Groups can overlap, and a few photos end up in none.`)}
+      <div class="panel stack">
+        <div class="row" style="justify-content:space-between"><h2 style="margin:0">${nodes.length} groups found</h2><span class="label">Click a group · bubble size = photos in it</span></div>
+        <svg class="map" id="bubbles" role="img" aria-label="Mapper graph of groups"></svg>
+        <p class="small muted">Lines join groups that share photos. ${DATA.stats.covered} of ${items.length} photos landed in at least one group.</p>
+      </div>
+      <div class="panel split" id="groupSide"></div>
+      ${footer(s, "Done. Mapper settings come from Gayatri's run; more photos will give more, and more interesting, groups.")}
+    </div>`;
+  },
+  mount() { this.draw(); },
+  draw() {
+    const svg = $("#bubbles"); svg.innerHTML = "";
+    // x = where the group sits along Mapper's sliding direction (its lens); y only separates groups that would collide
+    const R = nodes.map(n => 24 + 12 * Math.sqrt(n.members.length));
+    const lens = nodes.map(n => n.members.reduce((a, i) => a + items[i].xy[0], 0) / n.members.length);
+    const lo = Math.min(...lens), hi = Math.max(...lens), maxR = Math.max(...R);
+    const W = 960, mid = 175;
+    const P = lens.map(v => [maxR + 20 + (v - lo) / (hi - lo || 1) * (W - 2 * maxR - 40), mid]);
+    const lanes = [0, -1, 1, -2, 2];
+    const placed = [];
+    nodes.map((_, i) => i).sort((a, b) => lens[a] - lens[b]).forEach(i => {
+      for (const l of lanes) {
+        const y = mid + l * (maxR * 1.1 + 30);
+        if (!placed.some(j => Math.hypot(P[j][0] - P[i][0], P[j][1] - y) < R[i] + R[j] + 30)) { P[i][1] = y; break; }
+      }
+      placed.push(i);
+    });
+    const ys = P.map((p, i) => [p[1] - R[i], p[1] + R[i]]);
+    const top = Math.min(...ys.map(y => y[0])) - 14, bottom = Math.max(...ys.map(y => y[1])) + 34;
+    const H = bottom - top + 40;
+    svg.setAttribute("viewBox", `0 ${top} ${W} ${H}`);
+    const axisY = bottom + 18;
+    svgEl("line", { x1: 20, x2: W - 20, y1: axisY, y2: axisY, stroke: "var(--ink-3)", "stroke-width": 1.2, "marker-end": "url(#lensArrow)" }, svg);
+    const at = svgEl("text", { x: 20, y: axisY - 8, "font-size": 12.5, "font-family": "var(--mono)", fill: "var(--ink-3)", "letter-spacing": ".08em" }, svg);
+    at.textContent = "MAPPER'S SLIDING DIRECTION →";
+    const defs = svgEl("defs", {}, svg);
+    const am = svgEl("marker", { id: "lensArrow", viewBox: "0 0 10 10", refX: 9, refY: 5, markerWidth: 7, markerHeight: 7, orient: "auto" }, defs);
+    svgEl("path", { d: "M0,0 L10,5 L0,10 z", fill: "var(--ink-3)" }, am);
+    const edgeLabels = [];
+    nodes.forEach((n, i) => {
+      for (let j = i + 1; j < nodes.length; j++) {
+        const shared = n.members.filter(x => nodes[j].members.includes(x)).length;
+        if (!shared) continue;
+        svgEl("line", { x1: P[i][0], y1: P[i][1], x2: P[j][0], y2: P[j][1], stroke: "var(--ink-3)", "stroke-width": 1 + shared, opacity: .45, "stroke-linecap": "round" }, svg);
+        edgeLabels.push([(P[i][0] + P[j][0]) / 2 + 10, (P[i][1] + P[j][1]) / 2 + 4, `${shared} shared`]);
+      }
+    });
+    nodes.forEach((n, i) => {
+      const [x, y] = P[i], r = R[i], sel = state.node === n.id;
+      const cid = "bc" + i;
+      const cp = svgEl("clipPath", { id: cid }, defs);
+      svgEl("circle", { cx: x, cy: y, r }, cp);
+      const g = svgEl("g", { class: "ph", "data-node": n.id, tabindex: 0, role: "button", "aria-label": `Group ${i + 1}` }, svg);
+      const cols = Math.ceil(Math.sqrt(n.members.length)), cell = 2 * r / cols, rows = Math.ceil(n.members.length / cols);
+      const oy = y - rows * cell / 2;
+      const cg = svgEl("g", { "clip-path": `url(#${cid})` }, g);
+      svgEl("rect", { x: x - r, y: y - r, width: 2 * r, height: 2 * r, fill: "var(--wash)" }, cg);
+      n.members.forEach((m, k) => svgEl("image", { href: items[m].thumb, x: x - r + (k % cols) * cell, y: oy + Math.floor(k / cols) * cell, width: cell + .5, height: cell + .5, preserveAspectRatio: "xMidYMid slice" }, cg));
+      svgEl("circle", { cx: x, cy: y, r, fill: "none", stroke: sel ? "var(--ink)" : "var(--surface)", "stroke-width": sel ? 4 : 3 }, g);
+      if (sel) svgEl("circle", { cx: x, cy: y, r: r + 7, fill: "none", stroke: "var(--ink)", "stroke-width": 1, "stroke-dasharray": "3 4" }, g);
+      const t = svgEl("text", { x, y: y + r + 22, "text-anchor": "middle", "font-size": 16, "font-weight": 700, fill: "var(--ink)", "font-family": "var(--display)", "paint-order": "stroke", stroke: "var(--surface)", "stroke-width": 5 }, g);
+      t.textContent = `Group ${i + 1}`;
+    });
+    for (const [lx, ly, txt] of edgeLabels) {
+      const t = svgEl("text", { x: lx, y: ly, "font-size": 13, "font-family": "var(--mono)", fill: "var(--ink-2)", "paint-order": "stroke", stroke: "var(--surface)", "stroke-width": 5 }, svg);
+      t.textContent = txt;
+    }
+    const n = nodeById[state.node], k = groupNo(n.id);
+    const loners = items.map((_, i) => i).filter(i => !items[i].groups.length);
+    const also = nodes.filter(o => o.id !== n.id && o.members.some(x => n.members.includes(x))).map(o => "Group " + groupNo(o.id));
+    $("#groupSide").innerHTML = `
+      <div class="mosaic" style="grid-template-columns:repeat(${Math.min(5, Math.max(3, Math.ceil(n.members.length / 2)))},minmax(0,1fr))">${n.members.map(i => `<div class="tile" style="cursor:default"><img src="${items[i].thumb}" alt=""></div>`).join("")}</div>
+      <div class="stack">
+        <div class="label">Group ${k} · ${plural(n.members.length, "photo")}</div>
+        <h2>What do these have in common?</h2>
+        <p class="small">${also.length ? `Shares photos with ${also.join(" and ")}.` : "Shares no photos with other groups."} Mapper only knows these photos sit close together. It has no idea <b>why</b>. Answering that is the AI's job in the next step.</p>
+        ${loners.length ? `<div class="label" style="margin-top:6px">In no group</div><div class="row">${loners.map(i => `<img src="${items[i].thumb}" alt="" style="width:40px;height:40px;object-fit:cover;border-radius:7px;opacity:.7">`).join("")}</div>` : ""}
+      </div>`;
+  },
+  click(t) {
+    const g = t.closest("[data-node]");
+    if (g) { state.node = g.dataset.node; this.draw(); return true; }
+  },
+};
+
+VIEWS.guess = {
+  html() {
+    const s = stageById.guess;
+    return `<div class="sheet">
+      ${head(s, "An AI looks at each group and guesses what they share", `The agent sees a few photos from inside the group and a few from outside, with their descriptions and object labels. It writes a hypothesis: a plain-English explanation, <b>the object it thinks matters</b>, and a short sentence CLIP can read.`)}
+      ${picker()}
+      <div id="guessBody"></div>
+      <div class="note"><span class="ic">!</span><span>These are <b>test hypotheses written by hand</b> in the format the agent produces. Running the real agent needs an OpenAI API key, so it will happen on the larger photo set.</span></div>
+      ${footer(s, "Agent built. The test run uses hand-written hypotheses; the real agent runs once there's a bigger photo set and an API key.")}
+    </div>`;
+  },
+  mount() { this.body(); },
+  body() {
+    const n = nodeById[state.node], k = groupNo(n.id);
+    const strip = (ids, cls) => `<div class="mosaic" style="grid-template-columns:repeat(${Math.min(3, ids.length || 1)},minmax(0,1fr))">${ids.map(i => `<div class="tile ${cls}" style="cursor:default"><img src="${items[i].thumb}" alt=""></div>`).join("")}</div>`;
+    const conf = n.confidence == null ? null : pct(n.confidence);
+    $("#guessBody").innerHTML = `<div class="split even" style="grid-template-columns:minmax(0,.8fr) minmax(0,1.3fr) minmax(0,.8fr)">
+      <div class="panel stack"><div class="label">Inside group ${k}</div>${strip(n.supporting.length ? n.supporting : n.members.slice(0, 3))}<p class="small">Examples from the group</p></div>
+      <div class="panel stack" style="border-color:var(--ink)">
+        <div class="label">The AI's hypothesis</div>
+        <h2 style="font-size:28px">${esc(n.name)}</h2>
+        <p>${esc(n.description)}</p>
+        <p class="small"><b>Why it thinks so:</b> ${esc(n.rationale)}</p>
+        <div class="stack" style="gap:8px">
+          <div class="row"><span class="label" style="width:118px">Object to hide</span>${n.objects.map(o => `<span class="chip">${esc(o)}</span>`).join("")}</div>
+          <div class="row"><span class="label" style="width:118px">Sentence for CLIP</span><span class="chip">"${esc(n.prompt)}"</span></div>
+          ${conf == null ? "" : `<div class="row"><span class="label" style="width:118px">How sure</span><span class="meter">${Array.from({ length: 10 }, (_, j) => `<i style="width:12px;height:12px" class="${j < Math.round(conf / 10) ? "" : "empty"}"></i>`).join("")}</span><b class="num">${conf}%</b></div>`}
+        </div>
+      </div>
+      <div class="panel stack"><div class="label">Outside the group</div>${strip(n.contrasts.length ? n.contrasts : [], "")}<p class="small">Contrast examples the AI compared against</p></div>
+    </div>`;
+  },
+  click(t) {
+    if (t.dataset.node) { state.node = t.dataset.node; $$(".pick").forEach(b => b.setAttribute("aria-pressed", b.dataset.node === state.node)); this.body(); return true; }
+  },
+};
+
+VIEWS["text-check"] = {
+  html() {
+    const s = stageById["text-check"];
+    return `<div class="sheet">
+      ${head(s, "The quick check: do the group's photos match the guess better than the rest?", `CLIP can read text as well as photos. We ask how well <b>each of the ${items.length} photos</b> matches the hypothesis sentence and line them up from weakest to strongest match. If the guess is good, the group's photos should bunch up on the right.`)}
+      ${picker()}
+      <div class="panel stack">
+        <div class="row" style="justify-content:space-between"><h2 style="margin:0" id="tcTitle"></h2><span class="row small"><span class="dot" style="--c:var(--ink)"></span>in the group <span class="dot" style="--c:var(--ink-3);margin-left:10px"></span>everyone else</span></div>
+        <div class="swarm" id="swarm"></div>
+      </div>
+      <div class="split" id="tcResult"></div>
+      ${footer(s, "Done. It's the yardstick the masking test has to beat. It runs on any hypothesis instantly, with no masking needed.")}
+    </div>`;
+  },
+  mount() { this.layout(true); window.addEventListener("resize", this._r = () => this.layout(false)); },
+  unmount() { window.removeEventListener("resize", this._r); },
+  layout(first) {
+    const n = nodeById[state.node], box = $("#swarm");
+    $("#tcTitle").innerHTML = `How well each photo matches "<span style="font-weight:700">${esc(n.prompt)}</span>"`;
+    const W = box.clientWidth, r = 21, m = n.matches;
+    const lo = Math.min(...m), hi = Math.max(...m);
+    const x = v => r + 4 + (v - lo) / (hi - lo || 1) * (W - 2 * r - 8);
+    const order = m.map((v, i) => i).sort((a, b) => m[a] - m[b]);
+    const placed = [];
+    const ys = {};
+    for (const i of order) {
+      const xi = x(m[i]);
+      let y = 0;
+      for (const cand of [0, 1, -1, 2, -2, 3, -3, 4, -4, 5, -5]) {
+        const yy = cand * (r * 1.05);
+        if (!placed.some(([px, py]) => Math.hypot(px - xi, py - yy) < 2 * r + 1)) { y = yy; break; }
+      }
+      placed.push([xi, y]); ys[i] = [xi, y];
+    }
+    const minY = Math.min(...placed.map(p => p[1])), maxY = Math.max(...placed.map(p => p[1]));
+    const H = maxY - minY + 2 * r + 46;
+    box.style.height = H + "px";
+    if (first || !box.children.length) {
+      box.innerHTML = items.map((it, i) => `<span class="s" data-i="${i}" data-tipphoto="${i}"><img src="${it.thumb}" alt=""></span>`).join("") + `<div class="axis"><span>← weaker match</span><span>stronger match →</span></div>`;
+    }
+    $$(".s", box).forEach(el => {
+      const i = +el.dataset.i, [xx, yy] = ys[i];
+      el.style.left = xx + "px"; el.style.top = (yy - minY + r + 6) + "px";
+      const inside = n.members.includes(i);
+      el.classList.toggle("in", inside); el.classList.toggle("out", !inside);
+    });
+    this.result();
+  },
+  result() {
+    const n = nodeById[state.node], b = n.baseline;
+    if (!b) { $("#tcResult").innerHTML = ""; return; }
+    const hits = Math.round(b.auroc * 10);
+    const rows = nodes.map((o, k) => `<div class="row" style="justify-content:space-between;border-bottom:1px solid var(--line);padding:7px 0"><span class="small"><b>Group ${k + 1}</b> · ${esc(o.name)}</span><span class="row small"><span class="num">${pct(o.baseline.auroc)} in 100</span><span class="pill" style="--c:${o.baseline.accepted ? "var(--good)" : "var(--bad)"};padding:2px 9px;font-size:12px"><i>${o.baseline.accepted ? "✓" : "✕"}</i>${o.baseline.accepted ? "Pass" : "Fail"}</span></span></div>`).join("");
+    $("#tcResult").innerHTML = `
+      <div class="panel stack">
+        <div class="label">Group ${groupNo(n.id)} result</div>
+        <div class="big-figure num">${pct(b.auroc)}<small> in 100</small></div>
+        <p>Pick one photo from the group and one from outside it. <b>${pct(b.auroc)} times in 100</b>, the group photo matches the sentence better.</p>
+        <div class="odds" aria-hidden="true">${Array.from({ length: 10 }, (_, j) => `<i class="${j < hits ? "" : "miss"}"></i>`).join("")}</div>
+        <div>${b.accepted ? `<span class="pill big" style="--c:var(--good)"><i>✓</i>Passes the quick check</span>` : `<span class="pill big" style="--c:var(--bad)"><i>✕</i>Fails the quick check</span>`}</div>
+      </div>
+      <div class="panel stack">
+        <div class="label">Why this isn't enough</div>
+        <p>This only shows that the group's photos <b>also</b> match the sentence. It can't show that the idea is <b>why</b> CLIP put them together. A group could match "a photo containing a person" just because people turn up in half the dataset.</p>
+        <div>${rows}</div>
+        <p class="small">It passed every one of the ${nodes.length} guesses. A test that never says no can't tell good explanations from bad ones.</p>
+      </div>`;
+  },
+  click(t) {
+    if (t.dataset.node) { state.node = t.dataset.node; $$(".pick").forEach(b => b.setAttribute("aria-pressed", b.dataset.node === state.node)); this.layout(false); return true; }
+  },
+};
+
+VIEWS.hide = {
+  html() {
+    const s = stageById.hide;
+    return `<div class="sheet">
+      ${head(s, `Hide the object. Then hide ${K} random patches of the same shape.`, `Using the object's outline, Dhruv's engine greys it out in CLIP's average colour. It then makes ${K} more copies, each with <b>the exact same shape greyed out somewhere else</b>. Any edit nudges CLIP a little. The ${K} random patches show how big that nudge normally is, so the object edit has something fair to be compared against.`)}
+      ${picker()}
+      <div class="split" id="hideBody"></div>
+      <div class="panel stack" id="hideCases"></div>
+      ${footer(s, `Done. Dhruv's engine runs end to end: it masks only inside the square CLIP crops to, skips objects too small to matter, and checks the unedited photos reproduce their stored embeddings.`)}
+    </div>`;
+  },
+  mount() { this.ensurePair(); this.body(); this.cases(); },
+  unmount() { cancelAnimationFrame(this._sweep); },
+  ensurePair() {
+    const list = pairsOf(state.node);
+    if (!list.some(p => p.id === state.pair)) {
+      const tested = list.filter(testable).sort((a, b) => (b.ranks.centroid + b.ranks.prompt) - (a.ranks.centroid + a.ranks.prompt));
+      state.pair = (tested[0] || list[0] || {}).id;
+    }
+  },
+  body() {
+    const list = pairsOf(state.node), n = nodeById[state.node];
+    const p = pairs.find(q => q.id === state.pair);
+    const it = p ? items[p.item] : null;
+    const obj = esc(n.objects.join(" or "));
+    const rows = list.map(q => {
+      const skip = SKIP[q.status];
+      return `<button class="prow" data-pair="${q.id}" aria-pressed="${q.id === state.pair}">
+        <img src="${items[q.item].thumb}" alt="">
+        <span><span class="nm">${testable(q) ? `${esc(objName(q))} hidden` : skip.short}</span><br><span class="sub">${q.status === "absent" ? `no ${obj} in this photo` : `${(q.visible * 100).toFixed(q.visible < .01 ? 1 : 0)}% of what CLIP sees`}</span>${q.status === "absent" ? "" : `<span class="cov"><i style="width:${Math.max(2, q.visible * 100)}%"></i></span>`}</span>
+        ${testable(q) ? `<span class="pill" style="--c:var(--good);font-size:12px;padding:2px 9px"><i>✓</i>Tested</span>` : `<span class="pill" style="--c:var(--ink-3);font-size:12px;padding:2px 9px"><i>–</i>Skipped</span>`}
+      </button>`;
+    }).join("");
+    let viewer;
+    if (p && testable(p)) {
+      const edited = state.edit === "target" ? p.target.img : p.controlImgs[0];
+      const [l, t, r, b] = it.crop;
+      viewer = `<div class="row" style="justify-content:space-between">
+          <div class="seg" role="group" aria-label="Which edit">
+            <button data-edit="target" aria-pressed="${state.edit === "target"}"><span class="dot" style="--c:var(--hidden)"></span>Object hidden</button>
+            <button data-edit="control" aria-pressed="${state.edit === "control"}"><span class="dot" style="--c:var(--patch)"></span>A random patch</button>
+          </div>
+          <span class="label">Drag to compare</span>
+        </div>
+        <div class="compare" id="cmp">
+          <img src="${edited}" alt="Edited photo">
+          <div class="top" style="clip-path:inset(0 50% 0 0)"><img src="${it.img}" alt="Original photo"></div>
+          <svg viewBox="0 0 ${it.w} ${it.h}" preserveAspectRatio="none" style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none"><rect x="${l}" y="${t}" width="${r - l}" height="${b - t}" fill="none" stroke="#fff" stroke-width="3" stroke-dasharray="14 10" vector-effect="non-scaling-stroke" opacity=".9"/></svg>
+          <div class="bar" style="left:50%"></div><div class="knob" style="left:50%">⇆</div>
+          <span class="tagL">Original</span><span class="tagR">${state.edit === "target" ? esc(objName(p)) + " hidden" : "Random patch 1 of " + K}</span>
+          <input type="range" id="cmpRange" min="0" max="100" value="50" aria-label="Compare original and edited photo">
+        </div>
+        <p class="small">The dashed box is the square CLIP actually looks at; anything outside it is cropped away before CLIP sees the photo. The ${esc(objName(p))} covers <b>${(p.visible * 100).toFixed(1)}%</b> of that square.</p>
+        <div class="label">${p.controlImgs.length} of the ${K} random patches</div>
+        <div class="patches">${p.controlImgs.map(src => `<img src="${src}" alt="">`).join("")}</div>`;
+    } else if (p) {
+      viewer = `<div class="viewer"><img src="${it.img}" alt=""></div><p class="small">${SKIP[p.status].long(esc(objName(p)))}</p>`;
+    } else {
+      viewer = `<p>No photos in this group.</p>`;
+    }
+    $("#hideBody").innerHTML = `
+      <div class="panel stack">${viewer}</div>
+      <div class="panel stack">
+        <h3>Group ${groupNo(n.id)}: which photos could be tested?</h3>
+        <p class="small">The guess names <b>${obj}</b>. A photo is tested only if it contains one that's big enough to matter, with room left for ${K} fair random patches.</p>
+        <div class="plist">${rows}</div>
+      </div>`;
+    const range = $("#cmpRange");
+    if (!range) return;
+    const top = $("#cmp .top"), bar = $("#cmp .bar"), knob = $("#cmp .knob");
+    const setV = v => { range.value = v; top.style.clipPath = `inset(0 ${100 - v}% 0 0)`; bar.style.left = v + "%"; knob.style.left = v + "%"; };
+    range.oninput = () => { cancelAnimationFrame(this._sweep); setV(+range.value); };
+    cancelAnimationFrame(this._sweep);
+    if (MOTION) {
+      // one sweep across the photo so the edit is seen without dragging, ending in the middle
+      const t0 = performance.now(), path = t => t < .45 ? 50 + 42 * Math.sin(t / .45 * Math.PI / 2) : t < 1 ? 92 - 82 * ((t - .45) / .55) : 10 + 40 * Math.min(1, (t - 1) / .35);
+      const step = now => { const t = (now - t0) / 1600; setV(path(Math.min(t, 1.35))); if (t < 1.35) this._sweep = requestAnimationFrame(step); };
+      this._sweep = requestAnimationFrame(step);
+    }
+  },
+  cases() {
+    const big = pairs.filter(p => p.status === "no_control_room").sort((a, b) => b.visible - a.visible)[0];
+    const tiny = pairs.filter(p => p.status === "too_small_in_crop" && p.visible > 0).sort((a, b) => b.visible - a.visible)[0];
+    const skipped = s => pairs.filter(p => p.status === s).length;
+    const card = (p, title, text) => p ? `<div class="case"><img src="${items[p.item].thumb}" alt=""><div class="stack" style="gap:6px"><h3>${title}</h3><p class="small">${text}</p></div></div>` : "";
+    $("#hideCases").innerHTML = `<h2>Photos the engine skips, and why</h2>
+      <p class="small" style="max-width:70ch">Object size breaks a fair comparison at both ends, so the engine checks first and records a reason instead of testing. Across this run it skipped ${skipped("no_control_room")} photos as too big and ${skipped("too_small_in_crop")} as too small.</p>
+      <div class="cases">
+        ${card(big, "Too big: no fair patch fits", big ? `The ${esc(objName(big))} fills ${pct(big.visible)}% of what CLIP sees, so ${K} same-shaped patches can't be placed elsewhere without mostly covering it again.` : "")}
+        ${card(tiny, "Too small: nothing to see", tiny ? `This ${esc(objName(tiny))} covers ${(tiny.visible * 100).toFixed(1)}% of what CLIP sees. Hiding it would barely change the photo, so it can't tell us much.` : "")}
+      </div>`;
+  },
+  click(t) {
+    if (t.dataset.node) { state.node = t.dataset.node; $$(".pick").forEach(b => b.setAttribute("aria-pressed", b.dataset.node === state.node)); this.ensurePair(); this.body(); return true; }
+    const pr = t.closest("[data-pair]"); if (pr) { state.pair = pr.dataset.pair; this.body(); return true; }
+    if (t.closest("[data-edit]")) { state.edit = t.closest("[data-edit]").dataset.edit; this.body(); return true; }
+  },
+};
+
+VIEWS.verify = {
+  html() {
+    const s = stageById.verify;
+    return `<div class="sheet">
+      ${head(s, "Does hiding the object matter more than hiding random patches?", `Every edit moves a photo to a new point in CLIP's space. <b>Distance alone tells us little</b>, because any grey blob moves a photo. So we ask two sharper questions, comparing the object edit against the ${K} random patches: did it make CLIP see <b>less of the guessed idea</b>, and did it push the photo <b>further out of its group</b>?`)}
+      ${picker()}
+      <div class="panel">
+        <div class="compass-wrap">
+          <div><svg class="compass" id="compass" role="img" aria-label="Compass comparing the object edit with the random patches"></svg></div>
+          <div class="stack" id="readout"></div>
+        </div>
+      </div>
+      <div class="panel stack" id="groupVerdict"></div>
+      ${footer(s, "Built. The verdict test reads Dhruv's per-photo results directly. Results that mean something wait on the real AI agent and a bigger photo set.")}
+    </div>`;
+  },
+  mount() { VIEWS.hide.ensurePair(); this.draw(); },
+  draw() {
+    drawCompass($("#compass"), state.node, state.pair);
+    this.readout();
+    this.group();
+  },
+  readout() {
+    const p = pairs.find(q => q.id === state.pair), n = nodeById[state.node];
+    const list = pairsOf(state.node);
+    const thumbs = `<div class="label">Group ${groupNo(n.id)} · pick a photo</div>
+      <div class="thumbs">${list.map(q => `<button data-pair="${q.id}" aria-pressed="${q.id === state.pair}" aria-label="Photo ${items[q.item].id}"><img src="${items[q.item].thumb}" alt="">${testable(q) ? "" : '<span class="x">–</span>'}</button>`).join("")}</div>`;
+    if (!p || !testable(p)) {
+      $("#readout").innerHTML = `${thumbs}<p class="small">${p ? SKIP[p.status].long(esc(objName(p))) : "No photos in this group."} Pick a photo without a dash to see its test.</p>`;
+      return;
+    }
+    const info = pairInfo(p);
+    $("#readout").innerHTML = `${thumbs}
+      <p class="small">North-south shows how well the photo matches "<b>${esc(n.prompt)}</b>". Each blue dot is one random patch. Dots <b>above</b> the dashed line lost less of the idea than hiding the ${esc(objName(p))} did.</p>
+      <div class="test-row">
+        <div class="label">Made CLIP see less of the idea than</div>
+        <div class="rankline num">${p.ranks.prompt} <small>of ${K} random patches</small></div>
+        ${strip(p.ranks.prompt, "var(--hidden)")}
+      </div>
+      <div class="test-row">
+        <div class="label">Pushed the photo further out of its group than</div>
+        <div class="rankline num">${p.ranks.centroid} <small>of ${K} random patches</small></div>
+        ${strip(p.ranks.centroid, "var(--joe)")}
+      </div>
+      <p class="small muted">If the object didn't matter, it would land somewhere in the middle of the ${K}, about ${Math.round(K / 2)}. North-south is stretched ${compassStretch}× compared with east-west so you can see it: one idea is only a thin slice of CLIP's 512 directions.</p>
+      <details class="raw"><summary>The numbers behind this photo</summary>
+        <table class="rawt num">
+          <tr><th></th><th>Match to the sentence</th><th>Rank of 25</th></tr>
+          <tr><td>Original</td><td>${info.m0.toFixed(3)}</td><td>#${info.rO}</td></tr>
+          <tr><td>Object hidden</td><td>${p.target.match.toFixed(3)}</td><td>#${info.rT}</td></tr>
+          <tr><td>Typical random patch</td><td>${info.mC.toFixed(3)}</td><td>#${info.rC}</td></tr>
+        </table>
+        <p class="small" style="margin-top:8px">Match is CLIP's cosine similarity between photo and sentence; for photos against text it usually sits between 0.15 and 0.35, so small differences matter. "Typical" is the middle of the ${K} random patches.</p>
+      </details>`;
+  },
+  group() {
+    const n = nodeById[state.node], list = pairsOf(n.id), v = n.verdict;
+    if (!v) { $("#groupVerdict").innerHTML = ""; return; }
+    const alpha = DATA.verdictConfig.alpha;
+    const testRow = (name, title, c) => {
+      const t = v.tests[name];
+      if (!t) return "";
+      const pass = t.q != null && t.q <= alpha;
+      return `<div class="testline">
+        <div><div class="label">${title}</div><div class="small">On average the object beat <b>${pct(t.pct)}%</b> of the random patches across ${plural(t.n, "photo")}. Chance of a fluke: <b>${luck(t.q)}</b>.</div></div>
+        <div class="pctbar" style="--c:${c}"><i style="width:${pct(t.pct)}%"></i><span class="mid" title="where luck would land"></span></div>
+        <span class="pill" style="--c:${pass ? "var(--good)" : "var(--bad)"}"><i>${pass ? "✓" : "✕"}</i>${pass ? "Passes" : "Doesn't pass"}</span>
+      </div>`;
+    };
+    const cards = list.map(q => {
+      if (!testable(q)) return `<button class="card out" data-pair="${q.id}" aria-pressed="${q.id === state.pair}"><span class="top"><img src="${items[q.item].thumb}" alt=""><span class="small">${SKIP[q.status].short}<br><span class="muted">not tested</span></span></span></button>`;
+      return `<button class="card" data-pair="${q.id}" aria-pressed="${q.id === state.pair}">
+        <span class="top"><img src="${items[q.item].thumb}" alt=""><span class="small">${esc(objName(q))}<br><span class="muted">tested</span></span></span>
+        <span class="mini-row"><span class="label">Idea</span>${strip(q.ranks.prompt, "var(--hidden)")}<b class="num">${q.ranks.prompt}</b></span>
+        <span class="mini-row"><span class="label">Group</span>${strip(q.ranks.centroid, "var(--joe)")}<b class="num">${q.ranks.centroid}</b></span>
+      </button>`;
+    }).join("");
+    const differs = n.engineLabel && n.engineLabel !== v.label;
+    $("#groupVerdict").innerHTML = `
+      <div class="row" style="justify-content:space-between;align-items:flex-start;gap:18px">
+        <div class="stack" style="gap:4px;max-width:62ch">
+          <div class="label">The verdict for group ${groupNo(n.id)}</div>
+          <h2>"${esc(n.name)}"</h2>
+          <p class="small">${LABEL[v.label].long} ${REASON[v.reason] ? REASON[v.reason](v) : ""}</p>
+        </div>
+        ${verdictPill(v.label, true)}
+      </div>
+      ${testRow("centroid", "Pushes photos out of the group", "var(--joe)")}
+      ${testRow("prompt", "Makes CLIP see less of the idea", "var(--hidden)")}
+      <div class="board">${cards}</div>
+      <div class="split even" style="align-items:start">
+        <div class="note"><span class="ic">?</span><span><b>How can 4 photos be enough?</b> Each photo races ${K} random patches. If the object didn't matter, finishing near the top in one photo would be a long shot, and doing it in photo after photo even more so. The test adds up every photo's placing and works out exactly how unlikely that total is by luck, then corrects for testing several guesses at once.</span></div>
+        ${differs ? `<div class="note"><span class="ic">⇄</span><span><b>Dhruv's engine said "${LABEL[n.engineLabel].text.toLowerCase()}".</b> It judges each photo alone (the object has to beat ${K - 1} of ${K} patches) and then takes a majority vote, so steady but smaller wins don't count. The combined test uses every photo's full placing.</span></div>` : ""}
+      </div>`;
+  },
+  click(t) {
+    if (t.dataset.node) {
+      state.node = t.dataset.node;
+      $$(".pick").forEach(b => b.setAttribute("aria-pressed", b.dataset.node === state.node));
+      VIEWS.hide.ensurePair(); this.draw(); return true;
+    }
+    const pr = t.closest("[data-pair]");
+    if (pr) { state.pair = pr.dataset.pair; this.draw(); return true; }
+  },
+};
+
+VIEWS.verdict = {
+  html() {
+    const s = stageById.verdict;
+    const textPass = nodes.filter(x => x.baseline && x.baseline.accepted).length;
+    const count = label => nodes.filter(x => x.verdict && x.verdict.label === label).length;
+    const rows = nodes.map((n, k) => {
+      const v = n.verdict, b = n.baseline;
+      const disagree = b && b.accepted && v && v.label === "not_supported";
+      const tests = v && v.tests.centroid ? `<span class="small num">group ${pct(v.tests.centroid.pct)}% · idea ${pct(v.tests.prompt.pct)}%</span>` : `<span class="small">${v && REASON[v.reason] ? ({ low_coverage: `visible in ${v.visible} of ${v.members}`, too_few_testable_members: `${v.testable} testable`, no_effect: "no effect", unknown_categories: "unknown object" })[v.reason] : ""}</span>`;
+      return `
+        <div class="nmcell"><img src="${items[n.members[0]].thumb}" alt=""><span><span class="label">Group ${k + 1}</span><br><b>${esc(n.name)}</b>${disagree ? `<br><span class="flag">⚑ The checks disagree</span>` : ""}</span></div>
+        <div><span class="pill" style="--c:var(--ink-3)"><i>?</i>Yes, ${n.confidence == null ? "–" : pct(n.confidence) + "% sure"}</span></div>
+        <div>${b ? `<span class="pill" style="--c:${b.accepted ? "var(--good)" : "var(--bad)"}"><i>${b.accepted ? "✓" : "✕"}</i>${b.accepted ? "Pass" : "Fail"}</span><span class="small num">${pct(b.auroc)} in 100</span>` : "–"}</div>
+        <div>${v ? verdictPill(v.label) : "–"}${tests}</div>`;
+    }).join("");
+    const flipped = nodes.find(n => n.verdict && n.engineLabel && n.engineLabel !== n.verdict.label);
+    const lowCov = nodes.filter(n => n.verdict && n.verdict.reason === "low_coverage").length;
+    return `<div class="sheet">
+      ${head(s, "So what can we conclude?", `This run uses hand-written guesses and 25 photos, so it shows <b>how the method behaves</b>, not findings. Even so, the three judges already disagree in ways that matter, and those disagreements are what the project is about.`)}
+      <section class="panel" style="padding:8px 22px 4px">
+        <div class="score-scroll"><div class="score">
+          <div class="hd">Hypothesis</div>
+          <div class="hd">Judge 1<b>The AI itself</b></div>
+          <div class="hd">Judge 2<b>Quick text check</b></div>
+          <div class="hd">Judge 3<b>Masking test</b></div>
+          ${rows}
+        </div></div>
+      </section>
+      <p class="small muted">Masking test figures: on average, how many of the ${K} random patches the object beat at pushing photos out of their group ("group") and at making CLIP see less of the idea ("idea"). Luck would land near 50%.</p>
+      <section class="stack">
+        <h2>Three things this run taught us</h2>
+        <div class="lessons">
+          <div class="panel lesson"><span class="k">01</span><h3>The quick check says yes to everything</h3><p class="small">It passed ${textPass} of ${nodes.length} guesses. The masking test supported ${count("supported")}. A check that never says no can't separate good explanations from bad ones.</p><button class="btn" data-go="text-check" style="align-self:flex-start">See the line-up</button></div>
+          <div class="panel lesson"><span class="k">02</span><h3>Evidence has to be added up across photos</h3><p class="small">${flipped ? `For "${esc(flipped.name)}", judging each photo alone and voting said "${LABEL[flipped.engineLabel].text.toLowerCase()}". Adding up every photo's placing shows the object beat ${pct(flipped.verdict.tests.centroid.pct)}% of random patches at pushing photos out of the group, steadily enough to be ${LABEL[flipped.verdict.label].text.toLowerCase()}.` : "Each photo alone is a noisy race against random patches; the combined test is what makes small, steady effects count."}</p><button class="btn" data-go="verify" style="align-self:flex-start">Open the compass</button></div>
+          <div class="panel lesson"><span class="k">03</span><h3>Most guesses name something the group doesn't show</h3><p class="small">${lowCov} of ${nodes.length} guesses name an object visible in under half of their group's photos, so it can't be what defines the group. A good agent should be pushed towards objects the whole group shares.</p><button class="btn" data-go="hide" style="align-self:flex-start">See which photos were tested</button></div>
+        </div>
+      </section>
+      <section class="panel stack" style="border-color:var(--ink)">
+        <div class="label">What the finished project will show</div>
+        <h2>How often does the quick check accept an explanation that the masking test rejects?</h2>
+        <p style="max-width:70ch">With the real agent and a few hundred photos, every group gets enough tested photos for a firm verdict. Then we count the disagreements between the judges. If the masking test rejects explanations the text check let through, we've shown that checking by perturbation catches convincing-but-wrong explanations. That's the result for the report.</p>
+        <div class="label" style="margin-top:6px">What's needed to get there</div>
+        <ul class="todo-list">
+          <li><span class="avatar" style="--c:var(--gayatri)">G</span><span>Run the real AI agent on a few hundred photos</span></li>
+          <li><span class="avatar" style="--c:var(--dhruv)">D</span><span>Agree the hand-over format and review the leave-one-out centre change</span></li>
+          <li><span class="avatar" style="--c:var(--joe)">J</span><span>Run the verdict test and the text check on the full set</span></li>
+          <li><span class="avatar" style="--c:var(--team)">✦</span><span>Agree what counts as a "correct" explanation, then write it up</span></li>
+        </ul>
+      </section>
+      ${footer(s, "First results on test data. Rebuild this page with scripts/build_explorer.py whenever a new run lands.")}
+    </div>`;
+  },
+};
+
+// ================= small utilities
+function fitXY(points, W, H, pad) {
+  const xs = points.map(p => p[0]), ys = points.map(p => p[1]);
+  const x0 = Math.min(...xs), x1 = Math.max(...xs), y0 = Math.min(...ys), y1 = Math.max(...ys);
+  const s = Math.min((W - 2 * pad) / (x1 - x0 || 1), (H - 2 * pad) / (y1 - y0 || 1));
+  const ox = (W - s * (x1 - x0)) / 2, oy = (H - s * (y1 - y0)) / 2;
+  return { px: p => [ox + (p[0] - x0) * s, H - (oy + (p[1] - y0) * s)] };
+}
+function hexRgb(h) {
+  h = h.replace("#", "");
+  if (h.length === 3) h = h.split("").map(c => c + c).join("");
+  return [0, 2, 4].map(i => parseInt(h.slice(i, i + 2), 16));
+}
+const tip = $("#tip");
+function showTip(e, html) {
+  tip.innerHTML = html; tip.style.opacity = 1;
+  tip.style.left = Math.min(e.clientX + 14, innerWidth - tip.offsetWidth - 10) + "px";
+  tip.style.top = Math.min(e.clientY + 14, innerHeight - tip.offsetHeight - 10) + "px";
+}
+function hideTip() { tip.style.opacity = 0; }
+document.addEventListener("mouseover", e => {
+  const t = e.target.closest("[data-tipphoto]");
+  if (!t) return;
+  const it = items[+t.dataset.tipphoto], n = nodeById[state.node];
+  const inside = n && n.members.includes(+t.dataset.tipphoto);
+  showTip(e, `${inside ? `<b>In group ${groupNo(n.id)}</b><br>` : ""}${esc(it.captions[0].slice(0, 140))}…`);
+  t.addEventListener("mouseleave", hideTip, { once: true });
+});
+
+// ================= router
+let current = null;
+function go(id, push = true) {
+  if (!VIEWS[id]) id = "overview";
+  if (current && VIEWS[current].unmount) VIEWS[current].unmount();
+  state.stage = id; current = id;
+  const view = $("#view");
+  view.innerHTML = VIEWS[id].html();
+  if (VIEWS[id].mount) VIEWS[id].mount();
+  renderRail();
+  if (push && location.hash.slice(1) !== id) history.replaceState(null, "", "#" + id);
+  window.scrollTo({ top: 0 });
+  const active = $(".step[aria-current]");
+  if (active && innerWidth <= 900) active.scrollIntoView({ inline: "center", block: "nearest" });
+}
+document.addEventListener("click", e => {
+  const goBtn = e.target.closest("[data-go]");
+  if (goBtn) { go(goBtn.dataset.go); return; }
+  const person = e.target.closest("[data-person]");
+  if (person) { state.person = state.person === person.dataset.person ? null : person.dataset.person; renderRail(); return; }
+  const v = VIEWS[current];
+  if (v && v.click) {
+    const t = e.target.closest("[data-node],[data-pair],[data-edit],[data-photo]");
+    if (t) v.click(t);
+  }
+});
+document.addEventListener("keydown", e => {
+  if ((e.key === "Enter" || e.key === " ") && e.target.matches("g[role=button]")) { e.preventDefault(); e.target.dispatchEvent(new MouseEvent("click", { bubbles: true })); }
+});
+window.addEventListener("hashchange", () => { const id = location.hash.slice(1); if (id !== current) go(id, false); });
+window.addEventListener("resize", () => drawTrack());
+matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => go(current, false));
+document.fonts && document.fonts.ready.then(() => drawTrack());
+go(location.hash.slice(1) || "overview", false);
+</script>
+</body>
+</html>
