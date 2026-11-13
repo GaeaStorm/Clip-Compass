@@ -4,6 +4,17 @@ Clip Compass expands on [Explainable Mapper](https://arxiv.org/html/2507.18607v1
 by exploring CLIP image embedding spaces and testing whether visual perturbations
 can verify explanations of how images are grouped.
 
+**Visual walkthrough:** download
+[`docs/clip-compass.html`](docs/clip-compass.html) and open it in a browser. It
+walks through every pipeline stage with the 25-photo test run's real photos,
+groups, masked images and verdicts, and shows who owns each stage. It is a
+snapshot; to refresh it after a new run:
+
+```bash
+.venv/bin/python scripts/build_explorer.py
+cp artifacts/diagnostics/explorer/explorer.html docs/clip-compass.html
+```
+
 ## Current pipeline
 
 The first implemented stage prepares a deterministic subset of COCO images paired
@@ -264,8 +275,8 @@ through the normal embedding cache. Objects covering less than 1% of the visible
 crop, or too large to leave room for controls, are recorded but not tested.
 
 Each image is scored against its own controls on two statistics: the increase
-in distance from the node centroid, and the drop in similarity to the positive
-prompt. A hypothesis is `supported` when a strict majority of testable members
+in distance from the node centroid (computed without the image under test), and
+the drop in similarity to the positive prompt. A hypothesis is `supported` when a strict majority of testable members
 beat their controls (empirical p <= 0.05) on centroid distance, and
 `detected_not_explanatory` when only the prompt test passes. It is
 `not_supported` when neither passes or the categories are visible in fewer than
@@ -273,6 +284,101 @@ half the members, and `untestable` (with a reason) otherwise.
 `prediction_confirmed` records whether the explanation agent's own
 `predicted_effect` came true. `--verified-output` writes only the supported
 hypotheses as an explanation artifact, for comparison with the unfiltered set.
+
+## Hypothesis verdicts and the text baseline
+
+`perturb run` judges each image on its own and then takes a majority vote.
+`verification verdicts` reads the same per-image results and gives each
+hypothesis one calibrated verdict instead:
+
+```bash
+.venv/bin/clip-compass verification verdicts \
+  --results artifacts/perturbations/fixture-dk/verification.json \
+  --explanations artifacts/explanations/coco_val_first_25-all-nodes-offline-fixture.json
+```
+
+For every testable image it counts how many of the 39 controls the object edit
+beat on each statistic. Under the null hypothesis the object is just another
+random region, so that rank is uniform on 0..39 in each image. The summed rank
+across a hypothesis's images then has an exact null distribution (a convolution
+of uniforms), which gives one p-value per hypothesis and statistic.
+Benjamini-Hochberg corrects those p-values across hypotheses within each
+statistic. Consistent moderate effects therefore add up: five images that each
+beat 32 of 39 controls are significant together (p < 0.01), even though none
+would pass a per-image threshold. Two images that beat every control give
+p = 1/1600.
+
+Labels follow the engine's scheme: `supported` when the centroid test passes
+after correction, `detected_not_explanatory` when only the prompt test passes,
+`not_supported` when neither does or when the categories are visible in fewer
+than half the members, `insufficient_evidence` with fewer than two testable
+images, and `untestable` for empty or unknown categories. The output directory
+(`artifacts/verification/<run>/`) holds `verdicts.json`, `hypotheses.csv` (one
+row per hypothesis, with the mean share of controls beaten, p-values and
+q-values) and `images.csv` (one row per image).
+
+The text-only comparison arm asks whether the hypothesis prompt scores the
+node's members above every other image, with no perturbation at all:
+
+```bash
+.venv/bin/clip-compass verification baseline \
+  --graph artifacts/mapper/coco_val_first_25-pca1_normalized-mapper.json \
+  --embeddings artifacts/embeddings/coco_val_first_25-clip-vit-b32.npz \
+  --explanations artifacts/explanations/coco_val_first_25-all-nodes-offline-fixture.json \
+  --prompt-embeddings artifacts/text-embeddings/fixture-prompts.npz
+```
+
+It reports the inside and outside mean similarity and the AUROC (how often a
+member outscores a non-member), and accepts a hypothesis when members score
+higher on average. Build the prompt embeddings with `explanations
+export-prompts` followed by `embeddings encode-texts`.
+
+## Judging the judges: control hypotheses
+
+Disagreement between the text check and the masking test does not show which
+one is right. `verification controls` writes hypotheses whose right answer is
+known from COCO labels, in the same format the agent produces, so they run
+through the unchanged pipeline:
+
+- `obvious` (should be accepted): a category present in at least half the
+  node's photos and at least twice as common inside the node as outside;
+- `common` (should be rejected): present in at least half the node's photos but
+  no more than 1.25 times as common inside as outside;
+- `swapped` (should be rejected): another node's real hypothesis whose objects
+  are not enriched in this node, preferring objects the node's photos do contain.
+
+A category counts as present when one of its instances covers at least 1% of
+the image. The command also writes an answer key tied to the exact controls
+file:
+
+```bash
+.venv/bin/clip-compass verification controls \
+  --graph artifacts/mapper/coco_val_first_25-pca1_normalized-mapper.json \
+  --annotations data/processed/coco_instances/coco_val_first_25-instances.json \
+  --explanations artifacts/explanations/coco_val_first_25-all-nodes-offline-fixture.json \
+  --output artifacts/explanations/fixture-controls.json
+```
+
+Run the controls through `explanations export-prompts`, `embeddings
+encode-texts`, `verification baseline`, `perturb run` and `verification
+verdicts` exactly as for real hypotheses, then score every judge:
+
+```bash
+.venv/bin/clip-compass verification evaluate \
+  --key artifacts/explanations/fixture-controls-key.json \
+  --verdicts artifacts/verification/fixture-controls/verdicts.json \
+  --baseline artifacts/verification/fixture-controls-baseline/baseline.json \
+  --output-dir artifacts/verification/fixture-controls-evaluation
+```
+
+For each judge (the agent, which accepts everything; the text check; the
+masking test; and a lenient masking variant that also accepts
+`detected_not_explanatory`) it reports the hit rate on controls that should be
+accepted, the false-alarm rate on controls that should be rejected, accuracy,
+and how many controls the judge could not decide. Undecided controls count as
+not accepted, so `*_decided` rates that leave them out are reported too.
+`judge_scores.csv` breaks the results down by control kind and `controls.csv`
+lists every control with each judge's decision.
 
 See [the manual pipeline test](docs/manual-pipeline-test.md) for a one-node smoke
 test, CLIP discrimination check, perturbation verification, and complete rebuild

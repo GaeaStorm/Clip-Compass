@@ -5,7 +5,8 @@ For each node member that contains the hypothesis categories, the object mask an
 An image *exceeds* on a statistic when the object mask beats its controls
 (empirical p <= alpha):
 
-- ``centroid``: increase in distance from the node centroid
+- ``centroid``: increase in distance from the node centroid (leave-one-out: the
+  image under test is excluded from its own centroid)
 - ``prompt``: drop in cosine similarity to the hypothesis's positive prompt
 
 Verdict rules, in order:

@@ -11,7 +11,7 @@ LOKY_MAX_CPU_COUNT=8 .venv/bin/python -m unittest discover -s tests -v
 .venv/bin/python -m pip check
 ```
 
-The suite should report 37 passing tests. `LOKY_MAX_CPU_COUNT` only prevents a
+The suite should report 59 passing tests. `LOKY_MAX_CPU_COUNT` only prevents a
 macOS/joblib CPU-detection warning in restricted environments.
 
 ## 2. Inspect the Mapper report
@@ -170,7 +170,85 @@ broccoli pieces in this image, so most of the broccoli in the bowl stays
 visible. Run the command again: every image should be a cache hit, and
 `shasum verification.json` should not change.
 
-## 7. Rebuild the complete local pipeline
+## 7. Turn per-image results into verdicts, and score the text baseline
+
+```bash
+.venv/bin/clip-compass verification verdicts \
+  --results artifacts/perturbations/coco_val_first_25-all-nodes-offline-fixture/verification.json \
+  --explanations artifacts/explanations/coco_val_first_25-all-nodes-offline-fixture.json \
+  --output-dir artifacts/verification/fixture
+
+.venv/bin/clip-compass explanations export-prompts \
+  --explanations artifacts/explanations/coco_val_first_25-all-nodes-offline-fixture.json \
+  --output artifacts/explanations/fixture-prompts.jsonl
+
+.venv/bin/clip-compass embeddings encode-texts \
+  --texts-file artifacts/explanations/fixture-prompts.jsonl \
+  --model-cache-dir artifacts/models/huggingface \
+  --output artifacts/text-embeddings/fixture-prompts.npz
+
+.venv/bin/clip-compass verification baseline \
+  --graph artifacts/mapper/coco_val_first_25-pca1_normalized-mapper.json \
+  --embeddings artifacts/embeddings/coco_val_first_25-clip-vit-b32.npz \
+  --explanations artifacts/explanations/coco_val_first_25-all-nodes-offline-fixture.json \
+  --prompt-embeddings artifacts/text-embeddings/fixture-prompts.npz \
+  --output-dir artifacts/verification/fixture-baseline
+```
+
+Open `artifacts/verification/fixture/hypotheses.csv`. With the current fixture,
+broccoli should be `supported`: its object edits beat about 82% of controls on
+centroid distance across all four testable images (q < 0.05), even though no
+single image beats 38 of 39 controls, so the engine's majority vote above says
+`detected_not_explanatory`. Bottle+fork should be `not_supported: no_effect`,
+and the remaining three `not_supported: low_coverage`. Every hypothesis row in
+`perturb run`'s output should appear once, and `images.csv` should have one row
+per node member and hypothesis. The baseline should accept all five hypotheses.
+
+## 8. Score the judges on control hypotheses
+
+```bash
+C=.venv/bin/clip-compass
+G=artifacts/mapper/coco_val_first_25-pca1_normalized-mapper.json
+E=artifacts/embeddings/coco_val_first_25-clip-vit-b32.npz
+A=data/processed/coco_instances/coco_val_first_25-instances.json
+X=artifacts/explanations/fixture-controls.json
+
+$C verification controls --graph $G --annotations $A \
+  --explanations artifacts/explanations/coco_val_first_25-all-nodes-offline-fixture.json \
+  --output $X
+$C explanations export-prompts --explanations $X \
+  --output artifacts/explanations/fixture-controls-prompts.jsonl
+$C embeddings encode-texts \
+  --texts-file artifacts/explanations/fixture-controls-prompts.jsonl \
+  --model-cache-dir artifacts/models/huggingface \
+  --output artifacts/text-embeddings/fixture-controls-prompts.npz
+$C verification baseline --graph $G --embeddings $E --explanations $X \
+  --prompt-embeddings artifacts/text-embeddings/fixture-controls-prompts.npz \
+  --output-dir artifacts/verification/fixture-controls-baseline
+$C perturb run --graph $G --embeddings $E --annotations $A \
+  --manifest data/processed/coco_localized_narratives/coco_val_first_25.jsonl \
+  --explanations $X --data-root data \
+  --output-dir artifacts/perturbations/fixture-controls \
+  --model-cache-dir artifacts/models/huggingface --local-files-only
+$C verification verdicts \
+  --results artifacts/perturbations/fixture-controls/verification.json \
+  --explanations $X --output-dir artifacts/verification/fixture-controls
+$C verification evaluate \
+  --key artifacts/explanations/fixture-controls-key.json \
+  --verdicts artifacts/verification/fixture-controls/verdicts.json \
+  --baseline artifacts/verification/fixture-controls-baseline/baseline.json \
+  --output-dir artifacts/verification/fixture-controls-evaluation
+```
+
+With 25 photos expect only seven controls: two `obvious` (broccoli for
+node-0000 and node-0001) and five `swapped`; no node has a category common
+enough to make a `common` control. The text check should accept both obvious
+controls and four of the five swapped ones. The masking test should reject all
+five swapped controls and support one obvious control (the other is
+`detected_not_explanatory`, which the lenient variant counts). Seven controls
+cannot support conclusions; this step only checks that the evaluation runs.
+
+## 9. Rebuild the complete local pipeline
 
 Use explicit output paths so subsequent commands are copy-pasteable:
 
@@ -207,6 +285,6 @@ Use explicit output paths so subsequent commands are copy-pasteable:
   --output artifacts/diagnostics/manual-coco25.html
 ```
 
-Then repeat steps 3-5 using `manual-coco25.json` and
+Then repeat steps 3-7 using `manual-coco25.json` and
 `manual-coco25.npz`. Exact topology can change if Mapper parameters change; a
 different node count is not automatically a failure.

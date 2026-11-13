@@ -32,6 +32,13 @@ from clip_compass.mapper.lenses import LENS_NAMES, LensResult, compute_lens
 from clip_compass.perturbation.service import verify_hypotheses
 from clip_compass.perturbation.types import FILLS, PerturbationConfig
 from clip_compass.perturbation.verify import format_summary, verified_explanations
+from clip_compass.verification import VerdictConfig, aggregate_verdicts, score_prompt_baseline
+from clip_compass.verification.controls import ControlConfig, build_controls, save_controls
+from clip_compass.verification.evaluation import (
+    evaluate_judges,
+    format_evaluation,
+    save_evaluation,
+)
 
 
 def _manifest_images(
@@ -262,6 +269,55 @@ def _parser() -> argparse.ArgumentParser:
     perturb_run.add_argument("--batch-size", type=int, default=16)
     perturb_run.add_argument("--model-cache-dir", type=Path)
     perturb_run.add_argument("--local-files-only", action="store_true")
+
+    verification = commands.add_parser(
+        "verification", help="Judge hypotheses from perturbation results; score the text baseline"
+    )
+    verification_commands = verification.add_subparsers(
+        dest="verification_command", required=True
+    )
+    verdicts = verification_commands.add_parser(
+        "verdicts", help="One calibrated verdict per hypothesis from `perturb run` results"
+    )
+    verdicts.add_argument(
+        "--results", type=Path, required=True, help="verification.json from `perturb run`"
+    )
+    verdicts.add_argument("--explanations", type=Path, required=True)
+    verdicts.add_argument("--artifacts-root", type=Path, default=Path("artifacts"))
+    verdicts.add_argument("--output-dir", type=Path)
+    verdicts.add_argument("--alpha", type=float, default=0.05)
+    verdicts.add_argument("--min-testable", type=int, default=2)
+    verdicts.add_argument("--min-coverage", type=float, default=0.5)
+    baseline = verification_commands.add_parser(
+        "baseline", help="Text-only arm: do group members match the hypothesis prompt best?"
+    )
+    baseline.add_argument("--graph", type=Path, required=True)
+    baseline.add_argument("--embeddings", type=Path, required=True)
+    baseline.add_argument("--explanations", type=Path, required=True)
+    baseline.add_argument("--prompt-embeddings", type=Path, required=True)
+    baseline.add_argument("--artifacts-root", type=Path, default=Path("artifacts"))
+    baseline.add_argument("--output-dir", type=Path)
+    controls = verification_commands.add_parser(
+        "controls", help="Write control hypotheses with known right answers, plus an answer key"
+    )
+    controls.add_argument("--graph", type=Path, required=True)
+    controls.add_argument("--annotations", type=Path, required=True)
+    controls.add_argument(
+        "--explanations", type=Path, help="Real hypotheses to swap between nodes (optional)"
+    )
+    controls.add_argument("--output", type=Path, required=True, help="Control explanations JSON")
+    controls.add_argument("--key-output", type=Path, help="Answer key (default: <output>-key.json)")
+    controls.add_argument("--min-area-fraction", type=float, default=0.01)
+    controls.add_argument("--min-coverage", type=float, default=0.5)
+    controls.add_argument("--min-enrichment", type=float, default=2.0)
+    controls.add_argument("--max-common-enrichment", type=float, default=1.25)
+    evaluate = verification_commands.add_parser(
+        "evaluate", help="Score each judge on the control hypotheses"
+    )
+    evaluate.add_argument("--key", type=Path, required=True)
+    evaluate.add_argument("--verdicts", type=Path, help="`verification verdicts` verdicts.json")
+    evaluate.add_argument("--baseline", type=Path, help="`verification baseline` baseline.json")
+    evaluate.add_argument("--output-dir", type=Path, required=True)
 
     lenses = commands.add_parser("lens", help="Compute Mapper lens values")
     lens_commands = lenses.add_subparsers(dest="lens_command", required=True)
@@ -533,6 +589,71 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                 verified.save(args.verified_output)
                 summary["verified_output"] = str(args.verified_output.resolve())
         print(json.dumps(summary, indent=2, sort_keys=True))
+        return 0
+    if args.command == "verification" and args.verification_command == "verdicts":
+        artifacts = ArtifactPaths.from_root(args.artifacts_root)
+        output_dir = args.output_dir or (artifacts.verification / args.results.parent.name)
+        artifact = aggregate_verdicts(
+            args.results,
+            args.explanations,
+            config=VerdictConfig(
+                alpha=args.alpha,
+                min_testable=args.min_testable,
+                min_coverage=args.min_coverage,
+            ),
+        )
+        paths = artifact.save(output_dir)
+        summary = dict(artifact.summary())
+        summary.update({name: str(path) for name, path in paths.items()})
+        print(json.dumps(summary, indent=2, sort_keys=True))
+        return 0
+    if args.command == "verification" and args.verification_command == "baseline":
+        artifacts = ArtifactPaths.from_root(args.artifacts_root)
+        output_dir = args.output_dir or (
+            artifacts.verification / f"{args.explanations.stem}-baseline"
+        )
+        baseline_artifact = score_prompt_baseline(
+            MapperGraphArtifact.load(args.graph),
+            EmbeddingBatch.load(args.embeddings),
+            ExplanationArtifact.load(args.explanations),
+            EmbeddingBatch.load(args.prompt_embeddings),
+            graph_path=args.graph,
+            explanations_path=args.explanations,
+        )
+        paths = baseline_artifact.save(output_dir)
+        summary = dict(baseline_artifact.summary())
+        summary.update({name: str(path) for name, path in paths.items()})
+        print(json.dumps(summary, indent=2, sort_keys=True))
+        return 0
+    if args.command == "verification" and args.verification_command == "controls":
+        artifact, keys = build_controls(
+            MapperGraphArtifact.load(args.graph),
+            CocoInstanceSubset.load(args.annotations),
+            graph_path=args.graph,
+            annotations_path=args.annotations,
+            explanations=ExplanationArtifact.load(args.explanations) if args.explanations else None,
+            config=ControlConfig(
+                min_area_fraction=args.min_area_fraction,
+                min_coverage=args.min_coverage,
+                min_enrichment=args.min_enrichment,
+                max_common_enrichment=args.max_common_enrichment,
+            ),
+        )
+        key_path = args.key_output or args.output.with_name(f"{args.output.stem}-key.json")
+        save_controls(artifact, keys, args.output, key_path)
+        counts = {
+            kind: sum(key.kind == kind for key in keys) for kind in ("obvious", "common", "swapped")
+        }
+        summary = {"controls": counts, "output": str(args.output), "key": str(key_path)}
+        print(json.dumps(summary, indent=2))
+        return 0
+    if args.command == "verification" and args.verification_command == "evaluate":
+        evaluation = evaluate_judges(
+            args.key, verdicts_path=args.verdicts, baseline_path=args.baseline
+        )
+        paths = save_evaluation(evaluation, args.output_dir)
+        print(format_evaluation(evaluation))
+        print(json.dumps({name: str(path) for name, path in paths.items()}, indent=2))
         return 0
     if args.command == "lens" and args.lens_command == "compute":
         embeddings = EmbeddingBatch.load(args.embeddings)

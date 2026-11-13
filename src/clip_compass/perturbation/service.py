@@ -321,8 +321,6 @@ def _score(
 
     images = pending.images
     if pending.variants:
-        centroid = node_centroid(inputs.embeddings.normalized, pending.node.member_indices)
-        centroid = centroid.astype(np.float64)
         positive = prompts[pending.hypothesis_id]
         images = tuple(
             replace(
@@ -330,7 +328,7 @@ def _score(
                 score=_score_image(
                     vectors[identities[image.item_id]],
                     np.stack([vectors[variant] for variant in pending.variants[image.item_id]]),
-                    centroid,
+                    _leave_one_out_centroid(inputs, pending.node, image.item_id),
                     positive,
                 ),
             )
@@ -358,6 +356,19 @@ def _score(
             config=config,
         ),
     )
+
+
+def _leave_one_out_centroid(inputs: _Inputs, node: MapperNode, item_id: str) -> np.ndarray:
+    """The node centroid without the image under test.
+
+    Including the image would pull the centroid towards it, which weakens the
+    centroid test most in small nodes.
+    """
+
+    position = inputs.graph.item_ids.index(item_id)
+    others = [index for index in node.member_indices if index != position]
+    centroid = node_centroid(inputs.embeddings.normalized, others or node.member_indices)
+    return centroid.astype(np.float64)
 
 
 def _score_image(
