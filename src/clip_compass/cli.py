@@ -29,13 +29,9 @@ from clip_compass.mapper.builder import MapperConfig, build_mapper_graph
 from clip_compass.mapper.diagnostics import write_mapper_diagnostic_report
 from clip_compass.mapper.graph import MapperGraphArtifact
 from clip_compass.mapper.lenses import LENS_NAMES, LensResult, compute_lens
-from clip_compass.perturbation.verify import (
-    FILLS,
-    PerturbationConfig,
-    format_summary,
-    verified_explanations,
-    verify_hypotheses,
-)
+from clip_compass.perturbation.service import verify_hypotheses
+from clip_compass.perturbation.types import FILLS, PerturbationConfig
+from clip_compass.perturbation.verify import format_summary, verified_explanations
 from clip_compass.verification import VerdictConfig, aggregate_verdicts, score_prompt_baseline
 from clip_compass.verification.controls import ControlConfig, build_controls, save_controls
 from clip_compass.verification.evaluation import (
@@ -582,7 +578,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         )
         print(format_summary(results))
         summary = {
-            "min_identity_cosine": results["min_identity_cosine"],
+            "min_identity_cosine": results.min_identity_cosine,
             "output": str((output_dir / "verification.json").resolve()),
         }
         if args.verified_output:

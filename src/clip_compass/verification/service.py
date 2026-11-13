@@ -21,7 +21,7 @@ import numpy as np
 
 from clip_compass.data.coco_instances import sha256_file
 from clip_compass.explanations.types import ExplanationArtifact, hypothesis_id
-from clip_compass.perturbation.verify import load_results
+from clip_compass.perturbation.types import HypothesisResult, VerificationResults
 
 from .stats import benjamini_hochberg, object_rank, rank_sum_p_value
 from .types import (
@@ -37,26 +37,22 @@ from .types import (
 VISIBLE_STATUSES = ("testable", "no_control_room")
 
 
-def _image_results(hypothesis: Mapping[str, object]) -> List[ImageResult]:
+def _image_results(hypothesis: HypothesisResult) -> List[ImageResult]:
     results = []
-    for image in hypothesis["images"]:
-        status = str(image["status"])
-        if status != "testable":
-            results.append(
-                ImageResult(str(hypothesis["hypothesis_id"]), str(image["item_id"]), status)
-            )
+    for image in hypothesis.images:
+        if image.status != "testable" or image.score is None:
+            results.append(ImageResult(hypothesis.hypothesis_id, image.item_id, image.status))
             continue
-        counts = {len(image["controls"][statistic]) for statistic in STATISTICS}
+        score = image.score
+        counts = {len(score.controls[statistic]) for statistic in STATISTICS}
         if len(counts) != 1:
-            raise ValueError(f"image {image['item_id']} has unequal control counts per statistic")
+            raise ValueError(f"image {image.item_id} has unequal control counts per statistic")
         ranks = {
-            statistic: object_rank(image["object"][statistic], image["controls"][statistic])
+            statistic: object_rank(score.object[statistic], score.controls[statistic])
             for statistic in STATISTICS
         }
         results.append(
-            ImageResult(
-                str(hypothesis["hypothesis_id"]), str(image["item_id"]), status, counts.pop(), ranks
-            )
+            ImageResult(hypothesis.hypothesis_id, image.item_id, image.status, counts.pop(), ranks)
         )
     return results
 
@@ -74,17 +70,17 @@ def _test(statistic: str, images: List[ImageResult]) -> StatisticTest:
 
 
 def _label(
-    hypothesis: Mapping[str, object],
+    hypothesis: HypothesisResult,
     images: List[ImageResult],
     tests: Mapping[str, StatisticTest],
     config: VerdictConfig,
 ) -> tuple:
-    member_count = int(hypothesis["member_count"])
+    member_count = hypothesis.member_count
     visible = sum(image.status in VISIBLE_STATUSES for image in images)
     testable = sum(image.status == "testable" for image in images)
-    if not hypothesis["coco_categories"]:
+    if not hypothesis.coco_categories:
         return "untestable", "empty_categories"
-    if hypothesis.get("unknown_categories"):
+    if hypothesis.unknown_categories:
         return "untestable", "unknown_categories"
     if not images or all(image.status == "absent" for image in images):
         return "untestable", "no_member_contains_categories"
@@ -110,9 +106,9 @@ def aggregate_verdicts(
     """Read ``perturb run`` results and return calibrated per-hypothesis verdicts."""
 
     config = config or VerdictConfig()
-    results = load_results(results_path)
+    results = VerificationResults.load(results_path)
     explanations_sha256 = sha256_file(explanations_path)
-    if results["inputs"]["explanations_sha256"] != explanations_sha256:
+    if results.inputs["explanations_sha256"] != explanations_sha256:
         raise ValueError("perturbation results were produced from different explanations")
     explanations = ExplanationArtifact.load(explanations_path)
     confidence: Dict[str, float] = {
@@ -121,7 +117,7 @@ def aggregate_verdicts(
         for index, hypothesis in enumerate(explanation.hypotheses)
     }
 
-    hypotheses = list(results["hypotheses"])
+    hypotheses = list(results.hypotheses)
     images_by_hypothesis = [_image_results(hypothesis) for hypothesis in hypotheses]
     tests_by_hypothesis: List[Dict[str, StatisticTest]] = []
     for images in images_by_hypothesis:
@@ -148,7 +144,7 @@ def aggregate_verdicts(
     verdicts = []
     for hypothesis, images, tests in zip(hypotheses, images_by_hypothesis, tests_by_hypothesis):
         label, reason = _label(hypothesis, images, tests, config)
-        predicted = str(hypothesis["predicted_effect"])
+        predicted = hypothesis.predicted_effect
         confirmed = None
         if tests and label != "untestable":
             confirmed = all(
@@ -156,13 +152,13 @@ def aggregate_verdicts(
             )
         verdicts.append(
             HypothesisVerdict(
-                hypothesis_id=str(hypothesis["hypothesis_id"]),
-                node_id=str(hypothesis["node_id"]),
-                name=str(hypothesis["name"]),
-                coco_categories=tuple(hypothesis["coco_categories"]),
+                hypothesis_id=hypothesis.hypothesis_id,
+                node_id=hypothesis.node_id,
+                name=hypothesis.name,
+                coco_categories=tuple(hypothesis.coco_categories),
                 predicted_effect=predicted,
-                confidence=confidence.get(str(hypothesis["hypothesis_id"])),
-                member_count=int(hypothesis["member_count"]),
+                confidence=confidence.get(hypothesis.hypothesis_id),
+                member_count=hypothesis.member_count,
                 visible_members=sum(image.status in VISIBLE_STATUSES for image in images),
                 testable_members=sum(image.status == "testable" for image in images),
                 tests=tests,
@@ -175,8 +171,8 @@ def aggregate_verdicts(
     return VerdictArtifact(
         perturbation_results_sha256=sha256_file(results_path),
         explanations_sha256=explanations_sha256,
-        graph_sha256=str(results["inputs"]["graph_sha256"]),
-        model_fingerprint=str(results["model_fingerprint"]),
+        graph_sha256=str(results.inputs["graph_sha256"]),
+        model_fingerprint=str(results.model_fingerprint),
         config=config,
         hypotheses=tuple(verdicts),
         images=tuple(image for images in images_by_hypothesis for image in images),

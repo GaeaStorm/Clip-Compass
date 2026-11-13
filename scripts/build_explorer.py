@@ -37,7 +37,7 @@ from clip_compass.embeddings.cache import EmbeddingCache
 from clip_compass.embeddings.types import EmbeddingBatch
 from clip_compass.mapper.graph import MapperGraphArtifact
 from clip_compass.perturbation.masks import clip_visible_box
-from clip_compass.perturbation.verify import load_results
+from clip_compass.perturbation.types import VerificationResults
 from clip_compass.verification import VerdictArtifact
 
 SAMPLE_CONTROLS = 8  # random-patch images embedded in the page per photo (all 39 are plotted)
@@ -84,7 +84,7 @@ def main() -> None:
     prompts = EmbeddingBatch.load(args.prompt_embeddings)
     explanations = json.loads(args.explanations.read_text())
     annotations = json.loads(args.annotations.read_text())
-    results = load_results(args.perturbation_results)
+    results = VerificationResults.load(args.perturbation_results).as_dict()
     verdicts = VerdictArtifact.load(args.verdicts)
     if verdicts.perturbation_results_sha256 != sha256_file(args.perturbation_results):
         raise ValueError("verdicts were computed from different perturbation results")

@@ -195,6 +195,19 @@ class Fixture:
                 "positive_prompt": f"a photo of {name}",
                 "member_count": 6 if node_id == "node-0000" else 4,
                 "images": images,
+                # the engine's own verdict; required by the results format, unused here
+                "verdict": {
+                    "label": "untestable",
+                    "reason": None,
+                    "member_count": 6 if node_id == "node-0000" else 4,
+                    "visible_members": 0,
+                    "testable_members": 0,
+                    "tallies": {
+                        name: {"exceeding": 0, "testable": 0, "passes": False}
+                        for name in ("centroid", "prompt")
+                    },
+                    "prediction_confirmed": None,
+                },
             }
 
         self.results = {

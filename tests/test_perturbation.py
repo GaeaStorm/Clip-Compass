@@ -29,13 +29,14 @@ from clip_compass.perturbation.masks import (
     dilate,
     visible_pixels,
 )
-from clip_compass.perturbation.verify import (
+from clip_compass.perturbation.service import verify_hypotheses
+from clip_compass.perturbation.types import (
+    ImageResult,
+    ImageScore,
     PerturbationConfig,
-    _verdict,
-    load_results,
-    verified_explanations,
-    verify_hypotheses,
+    VerificationResults,
 )
+from clip_compass.perturbation.verify import decide, verified_explanations
 
 HAS_PIL = importlib.util.find_spec("PIL") is not None
 HAS_COCO = importlib.util.find_spec("pycocotools") is not None
@@ -106,14 +107,21 @@ def _hypothesis(name, categories, effect="decrease_text_similarity"):
 
 
 def _image(status="testable", centroid=False, prompt=False):
-    return {
-        "status": status,
-        "p": {"centroid": 0.025 if centroid else 1.0, "prompt": 0.025 if prompt else 1.0},
-    }
+    if status != "testable":
+        return ImageResult("1", status)
+    p = {"centroid": 0.025 if centroid else 1.0, "prompt": 0.025 if prompt else 1.0}
+    return ImageResult("1", status, 0.1, ImageScore(object={}, controls={}, p=p))
 
 
 def _judge(images, categories=("apple",), unknown=(), effect="decrease_text_similarity"):
-    return _verdict(categories, unknown, effect, len(images) or 2, images, PerturbationConfig())
+    return decide(
+        images,
+        categories=categories,
+        unknown=unknown,
+        predicted_effect=effect,
+        member_count=len(images) or 2,
+        config=PerturbationConfig(),
+    )
 
 
 class MaskTests(unittest.TestCase):
@@ -190,22 +198,22 @@ class MaskTests(unittest.TestCase):
 class VerdictTests(unittest.TestCase):
     def test_centroid_majority_is_supported(self) -> None:
         verdict = _judge([_image(centroid=True, prompt=True), _image(centroid=True)])
-        self.assertEqual(verdict["label"], "supported")
-        self.assertTrue(verdict["verified"])
-        self.assertFalse(verdict["prediction_confirmed"])  # prompt: 1 of 2 is no majority
+        self.assertEqual(verdict.label, "supported")
+        self.assertTrue(verdict.verified)
+        self.assertFalse(verdict.prediction_confirmed)  # prompt: 1 of 2 is no majority
 
     def test_prompt_only_is_detected_not_explanatory(self) -> None:
         images = [_image(prompt=True), _image(prompt=True)]
         verdict = _judge(images)
-        self.assertEqual(verdict["label"], "detected_not_explanatory")
-        self.assertTrue(verdict["prediction_confirmed"])
-        self.assertFalse(_judge(images, effect="both")["prediction_confirmed"])
+        self.assertEqual(verdict.label, "detected_not_explanatory")
+        self.assertTrue(verdict.prediction_confirmed)
+        self.assertFalse(_judge(images, effect="both").prediction_confirmed)
 
     def test_strict_majority_and_low_coverage(self) -> None:
         verdict = _judge([_image(centroid=True), _image()])
-        self.assertEqual((verdict["label"], verdict["reason"]), ("not_supported", "no_exceedance"))
+        self.assertEqual((verdict.label, verdict.reason), ("not_supported", "no_exceedance"))
         low = _judge([_image(centroid=True), _image(centroid=True)] + [_image("absent")] * 3)
-        self.assertEqual((low["label"], low["reason"]), ("not_supported", "low_coverage"))
+        self.assertEqual((low.label, low.reason), ("not_supported", "low_coverage"))
 
     def test_untestable_reasons(self) -> None:
         cases = {
@@ -217,8 +225,8 @@ class VerdictTests(unittest.TestCase):
             ),
         }
         for reason, verdict in cases.items():
-            self.assertEqual((verdict["label"], verdict["reason"]), ("untestable", reason))
-            self.assertIsNone(verdict["prediction_confirmed"])
+            self.assertEqual((verdict.label, verdict.reason), ("untestable", reason))
+            self.assertIsNone(verdict.prediction_confirmed)
 
 
 @unittest.skipUnless(HAS_PIL and HAS_COCO, "Pillow and pycocotools are required")
@@ -347,20 +355,20 @@ class VerifyHypothesesTests(unittest.TestCase):
         results = self._run()
         path = self.root / "run" / "verification.json"
         first = path.read_bytes()
-        verdicts = {h["hypothesis_id"]: h["verdict"] for h in results["hypotheses"]}
-        self.assertEqual(verdicts["node-0000-h00"]["label"], "supported")
-        self.assertTrue(verdicts["node-0000-h00"]["prediction_confirmed"])
-        self.assertEqual(verdicts["node-0001-h00"]["reason"], "too_few_testable_members")
-        self.assertEqual(verdicts["node-0001-h01"]["reason"], "empty_categories")
-        self.assertEqual(verdicts["node-0001-h02"]["reason"], "unknown_categories")
-        self.assertAlmostEqual(results["min_identity_cosine"], 1.0, places=6)
-        image = results["hypotheses"][0]["images"][0]
-        self.assertEqual(image["p"]["prompt"], 1 / 20)
-        self.assertEqual(len(image["controls"]["centroid"]), 19)
+        verdicts = {h.hypothesis_id: h.verdict for h in results.hypotheses}
+        self.assertEqual(verdicts["node-0000-h00"].label, "supported")
+        self.assertTrue(verdicts["node-0000-h00"].prediction_confirmed)
+        self.assertEqual(verdicts["node-0001-h00"].reason, "too_few_testable_members")
+        self.assertEqual(verdicts["node-0001-h01"].reason, "empty_categories")
+        self.assertEqual(verdicts["node-0001-h02"].reason, "unknown_categories")
+        self.assertAlmostEqual(results.min_identity_cosine, 1.0, places=6)
+        score = results.hypotheses[0].images[0].score
+        self.assertEqual(score.p["prompt"], 1 / 20)
+        self.assertEqual(len(score.controls["centroid"]), 19)
         self.assertTrue(
             (self.root / "run/images/1/1__node-0000-h00__apple__mean-d0__object.png").is_file()
         )
-        self.assertEqual(load_results(path)["hypotheses"], json.loads(first)["hypotheses"])
+        self.assertEqual(VerificationResults.load(path), results)
 
         calls = self.encoder.calls
         self._run()
