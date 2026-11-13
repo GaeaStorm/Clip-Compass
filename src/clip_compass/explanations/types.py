@@ -18,6 +18,14 @@ PREDICTED_EFFECTS = {
 }
 
 
+def hypothesis_id(node_id: str, index: int) -> str:
+    """Stable hypothesis identifier shared by prompt export and perturbation runs."""
+
+    if not node_id or index < 0:
+        raise ValueError("hypothesis IDs require a node ID and a non-negative index")
+    return f"{node_id}-h{index:02d}"
+
+
 @dataclass(frozen=True)
 class EvidenceItem:
     item_id: str

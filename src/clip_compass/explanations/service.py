@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Dict, List
 
 from .base import ExplanationAgent
-from .types import ExplanationArtifact, ExplanationContextBundle
+from .types import ExplanationArtifact, ExplanationContextBundle, hypothesis_id
 
 
 def generate_explanations(
@@ -41,7 +41,7 @@ def write_hypothesis_prompts(artifact: ExplanationArtifact, path: Path) -> Path:
     rows: List[Dict[str, object]] = []
     for explanation in artifact.explanations:
         for index, hypothesis in enumerate(explanation.hypotheses):
-            prefix = f"{explanation.node_id}-h{index:02d}"
+            prefix = hypothesis_id(explanation.node_id, index)
             rows.extend(
                 [
                     {

@@ -1,0 +1,26 @@
+# Defaults for `clip-compass perturb run` (PerturbationConfig in
+# src/clip_compass/perturbation/verify.py). Documentation only, like the other
+# files under configs/; every run records its configuration in verification.json.
+
+[masking]
+fill = "mean"                 # CLIP mean colour RGB (123, 117, 104); or "black"
+dilate_px = 3                 # square dilation of the segmentation union
+output_format = "png"         # always lossless
+
+[crop]
+# CLIPImageProcessor resizes the shorter side to 224 and centre-crops 224x224.
+size = 224
+min_visible_fraction = 0.01   # object pixels inside the crop / crop pixels
+
+[controls]
+count = 39                    # empirical p-values in steps of 1/40
+seed = 0
+max_overlap = 0.25            # max share of a control lying on the object
+
+[verdict]
+alpha = 0.05                  # an image exceeds when its object beats its controls at p <= alpha
+min_coverage = 0.5            # members with the categories visible / members
+min_testable = 2
+min_identity_cosine = 0.999   # unmasked PNG vs stored embedding
+# supported = strict majority of testable members exceed on centroid departure;
+# detected_not_explanatory = only the prompt-similarity test passes.
