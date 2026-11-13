@@ -20,10 +20,8 @@ Verdict rules, in order:
 
 from __future__ import annotations
 
-import json
-from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, List, Optional, Sequence
+from typing import List, Mapping, Optional, Sequence, Tuple
 
 from clip_compass.data.coco_instances import sha256_file
 from clip_compass.explanations.types import (
@@ -32,111 +30,81 @@ from clip_compass.explanations.types import (
     hypothesis_id,
 )
 
-SCHEMA_VERSION = 1
-FILLS = {"mean": (123, 117, 104), "black": (0, 0, 0)}  # mean = round(255 * CLIP image_mean)
-PREDICTED_STATISTICS = {
+from .types import (
+    STATISTICS,
+    ImageResult,
+    Label,
+    PerturbationConfig,
+    Statistic,
+    Tally,
+    Verdict,
+    VerificationResults,
+)
+
+PREDICTED_STATISTICS: Mapping[str, Tuple[Statistic, ...]] = {
     "decrease_text_similarity": ("prompt",),
     "move_away_from_node_centroid": ("centroid",),
     "both": ("centroid", "prompt"),
 }
 
 
-@dataclass(frozen=True)
-class PerturbationConfig:
-    controls: int = 39  # p-values in steps of 1/40, so p can reach 0.05
-    seed: int = 0
-    fill: str = "mean"
-    dilate_px: int = 3
-    min_visible_fraction: float = 0.01  # of the 224x224 crop, about half a ViT-B/32 patch
-    max_control_overlap: float = 0.25
-    alpha: float = 0.05
-    min_coverage: float = 0.5
-    min_testable: int = 2
-    min_identity_cosine: float = 0.999
-
-    def __post_init__(self) -> None:
-        if self.fill not in FILLS:
-            raise ValueError(f"fill must be one of {sorted(FILLS)}")
-        if self.controls < 1 or self.min_testable < 1 or self.dilate_px < 0:
-            raise ValueError("controls and min_testable must be positive; dilate_px >= 0")
-
-
 def decide(
+    images: Sequence[ImageResult],
+    *,
     categories: Sequence[str],
     unknown: Sequence[str],
     predicted_effect: str,
     member_count: int,
-    images: Sequence[Dict[str, object]],
     config: PerturbationConfig,
-) -> Dict[str, object]:
+) -> Verdict:
     """Apply the verdict rules to one hypothesis's scored member images."""
 
-    testable = [image for image in images if image["status"] == "testable"]
-    visible = sum(image["status"] in ("testable", "no_control_room") for image in images)
+    scores = [image.score for image in images if image.score is not None]
+    visible = sum(image.status in ("testable", "no_control_room") for image in images)
     tallies = {}
-    for name in ("centroid", "prompt"):
-        exceeding = sum(image["p"][name] <= config.alpha + 1e-12 for image in testable)
-        tallies[name] = {
-            "exceeding": exceeding,
-            "testable": len(testable),
-            "passes": 2 * exceeding > len(testable) > 0,
-        }
+    for name in STATISTICS:
+        exceeding = sum(score.p[name] <= config.alpha + 1e-12 for score in scores)
+        tallies[name] = Tally(exceeding, len(scores), 2 * exceeding > len(scores) > 0)
 
-    def result(label: str, reason: Optional[str] = None) -> Dict[str, object]:
+    def result(label: Label, reason: Optional[str] = None) -> Verdict:
         confirmed = None
-        if label != "untestable" and len(testable) >= config.min_testable:
+        if label != "untestable" and len(scores) >= config.min_testable:
             statistics = PREDICTED_STATISTICS[predicted_effect]
-            confirmed = all(tallies[name]["passes"] for name in statistics)
-        return {
-            "label": label,
-            "reason": reason,
-            "verified": label == "supported",
-            "member_count": member_count,
-            "visible_members": visible,
-            "testable_members": len(testable),
-            "tallies": tallies,
-            "prediction_confirmed": confirmed,
-        }
+            confirmed = all(tallies[name].passes for name in statistics)
+        return Verdict(label, reason, member_count, visible, len(scores), tallies, confirmed)
 
     if not categories:
         return result("untestable", "empty_categories")
     if unknown:
         return result("untestable", "unknown_categories")
-    if all(image["status"] == "absent" for image in images):
+    if all(image.status == "absent" for image in images):
         return result("untestable", "no_member_contains_categories")
     if visible < config.min_coverage * member_count:
         return result("not_supported", "low_coverage")
-    if len(testable) < config.min_testable:
+    if len(scores) < config.min_testable:
         return result("untestable", "too_few_testable_members")
-    if tallies["centroid"]["passes"]:
+    if tallies["centroid"].passes:
         return result("supported")
-    if tallies["prompt"]["passes"]:
+    if tallies["prompt"].passes:
         return result("detected_not_explanatory")
     return result("not_supported", "no_exceedance")
 
 
-def load_results(path: Path) -> Dict[str, object]:
-    results = json.loads(path.read_text(encoding="utf-8"))
-    if results.get("schema_version") != SCHEMA_VERSION:
-        raise ValueError("unsupported perturbation results schema version")
-    return results
-
-
-def format_summary(results: Dict[str, object]) -> str:
+def format_summary(results: VerificationResults) -> str:
     header = ("hypothesis", "categories", "coverage", "centroid", "prompt", "verdict", "reason")
     rows: List[Sequence[str]] = [header]
-    for result in results["hypotheses"]:
-        verdict = result["verdict"]
-        tallies = verdict["tallies"]
+    for result in results.hypotheses:
+        verdict = result.verdict
+        centroid, prompt = verdict.tallies["centroid"], verdict.tallies["prompt"]
         rows.append(
             (
-                result["hypothesis_id"],
-                "+".join(result["coco_categories"]) or "-",
-                f"{verdict['visible_members']}/{verdict['member_count']}",
-                f"{tallies['centroid']['exceeding']}/{tallies['centroid']['testable']}",
-                f"{tallies['prompt']['exceeding']}/{tallies['prompt']['testable']}",
-                verdict["label"],
-                verdict["reason"] or "-",
+                result.hypothesis_id,
+                "+".join(result.coco_categories) or "-",
+                f"{verdict.visible_members}/{verdict.member_count}",
+                f"{centroid.exceeding}/{centroid.testable}",
+                f"{prompt.exceeding}/{prompt.testable}",
+                verdict.label,
+                verdict.reason or "-",
             )
         )
     widths = [max(len(row[column]) for row in rows) for column in range(len(header))]
@@ -147,14 +115,14 @@ def format_summary(results: Dict[str, object]) -> str:
 
 
 def verified_explanations(
-    results: Dict[str, object], explanations_path: Path
+    results: VerificationResults, explanations_path: Path
 ) -> Optional[ExplanationArtifact]:
     """Keep only ``supported`` hypotheses, in the original schema; ``None`` if none survive."""
 
-    if sha256_file(explanations_path) != results["inputs"]["explanations_sha256"]:
+    if sha256_file(explanations_path) != results.inputs["explanations_sha256"]:
         raise ValueError("explanations file differs from the one these results verified")
     explanations = ExplanationArtifact.load(explanations_path)
-    verified = {h["hypothesis_id"] for h in results["hypotheses"] if h["verdict"]["verified"]}
+    verified = {h.hypothesis_id for h in results.hypotheses if h.verdict.verified}
     nodes = []
     for explanation in explanations.explanations:
         kept = tuple(

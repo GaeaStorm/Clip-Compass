@@ -2,22 +2,30 @@
 
 from .masks import category_mask, clip_visible_box, control_masks
 from .service import verify_hypotheses
-from .verify import (
+from .types import (
+    HypothesisResult,
+    ImageResult,
+    ImageScore,
     PerturbationConfig,
-    decide,
-    format_summary,
-    load_results,
-    verified_explanations,
+    Tally,
+    Verdict,
+    VerificationResults,
 )
+from .verify import decide, format_summary, verified_explanations
 
 __all__ = [
+    "HypothesisResult",
+    "ImageResult",
+    "ImageScore",
     "PerturbationConfig",
+    "Tally",
+    "Verdict",
+    "VerificationResults",
     "category_mask",
     "clip_visible_box",
     "control_masks",
     "decide",
     "format_summary",
-    "load_results",
     "verified_explanations",
     "verify_hypotheses",
 ]

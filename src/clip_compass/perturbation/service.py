@@ -2,28 +2,38 @@
 
 from __future__ import annotations
 
-import json
 import os
-from dataclasses import asdict, dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
-from typing import Dict, List, Mapping, Optional, Protocol, Tuple
+from typing import Dict, List, Mapping, Optional, Protocol, Sequence, Tuple
 
 import numpy as np
 
-from clip_compass.data.coco_instances import CocoInstanceSubset, sha256_file
+from clip_compass.data.coco_instances import CocoImage, CocoInstanceSubset, sha256_file
 from clip_compass.embeddings.base import ClipEncoder, ClipTextEncoder
 from clip_compass.embeddings.cache import EmbeddingCache
 from clip_compass.embeddings.service import embed_images, embed_texts
 from clip_compass.embeddings.types import EmbeddingBatch
 from clip_compass.explanations.context import node_centroid
-from clip_compass.explanations.types import ExplanationArtifact, hypothesis_id
+from clip_compass.explanations.types import (
+    ExplanationArtifact,
+    ExplanationHypothesis,
+    hypothesis_id,
+)
 from clip_compass.mapper.diagnostics import ManifestImage, load_manifest_images
-from clip_compass.mapper.graph import MapperGraphArtifact
+from clip_compass.mapper.graph import MapperGraphArtifact, MapperNode
 
 from .masks import category_mask, clip_visible_box, control_masks, visible_pixels
-from .verify import FILLS, SCHEMA_VERSION, PerturbationConfig, decide
-
-Record = Dict[str, object]
+from .types import (
+    FILLS,
+    STATISTICS,
+    HypothesisResult,
+    ImageResult,
+    ImageScore,
+    PerturbationConfig,
+    VerificationResults,
+)
+from .verify import decide
 
 
 class ClipImageTextEncoder(ClipEncoder, ClipTextEncoder, Protocol):
@@ -38,6 +48,21 @@ class _Inputs:
     explanations: ExplanationArtifact
     manifest: Mapping[str, ManifestImage]
     hashes: Mapping[str, str]
+    nodes: Mapping[str, MapperNode]
+    images: Mapping[str, CocoImage]
+
+
+@dataclass(frozen=True)
+class _Pending:
+    """A hypothesis whose member images are classified and rendered, but not yet scored."""
+
+    hypothesis_id: str
+    node: MapperNode
+    hypothesis: ExplanationHypothesis
+    categories: Tuple[str, ...]
+    unknown: Tuple[str, ...]
+    images: Tuple[ImageResult, ...]
+    variants: Mapping[str, Tuple[str, ...]]  # testable item ID -> (object, *control) IDs
 
 
 def verify_hypotheses(
@@ -53,7 +78,7 @@ def verify_hypotheses(
     output_dir: Path,
     config: Optional[PerturbationConfig] = None,
     batch_size: int = 16,
-) -> Record:
+) -> VerificationResults:
     """Mask, embed, and judge every hypothesis; write ``verification.json``."""
 
     config = config or PerturbationConfig()
@@ -67,20 +92,22 @@ def verify_hypotheses(
         data_root=data_root,
         encoder=encoder,
     )
-    hypotheses, pngs = _render(inputs, config, output_dir)
-    vectors, prompts, min_identity = _embed(
-        pngs, hypotheses, inputs, encoder, cache, config, batch_size
+    writer = _ImageWriter(output_dir / "images", inputs, FILLS[config.fill])
+    pending = _render(inputs, config, writer)
+    prompts = {p.hypothesis_id: p.hypothesis.positive_prompt for p in pending if p.variants}
+    vectors, prompt_vectors = _embed(writer.pngs, prompts, encoder, cache, batch_size)
+    min_identity = _check_identity(vectors, writer.identities, inputs, config)
+    results = VerificationResults(
+        inputs=dict(inputs.hashes),
+        model_fingerprint=encoder.spec.fingerprint,
+        config=config,
+        min_identity_cosine=min_identity,
+        hypotheses=tuple(
+            _score(p, vectors, prompt_vectors, writer.identities, inputs, config)
+            for p in pending
+        ),
     )
-    _score(hypotheses, vectors, prompts, inputs, config)
-    results: Record = {
-        "schema_version": SCHEMA_VERSION,
-        "inputs": dict(inputs.hashes),
-        "model_fingerprint": encoder.spec.fingerprint,
-        "config": asdict(config),
-        "min_identity_cosine": min_identity,
-        "hypotheses": hypotheses,
-    }
-    _save_json(output_dir / "verification.json", results)
+    results.save(output_dir / "verification.json")
     return results
 
 
@@ -96,10 +123,12 @@ def _load_and_check(
 ) -> _Inputs:
     """Load every input and refuse files that were not produced together."""
 
+    graph = MapperGraphArtifact.load(graph_path)
+    annotations = CocoInstanceSubset.load(annotations_path)
     inputs = _Inputs(
-        graph=MapperGraphArtifact.load(graph_path),
+        graph=graph,
         embeddings=EmbeddingBatch.load(embeddings_path),
-        annotations=CocoInstanceSubset.load(annotations_path),
+        annotations=annotations,
         explanations=ExplanationArtifact.load(explanations_path),
         manifest=load_manifest_images(manifest_path, data_root),
         hashes={
@@ -109,8 +138,10 @@ def _load_and_check(
             "explanations_sha256": sha256_file(explanations_path),
             "manifest_sha256": sha256_file(manifest_path),
         },
+        nodes={node.id: node for node in graph.nodes},
+        images=dict(zip(annotations.item_ids, annotations.images)),
     )
-    graph, explanations = inputs.graph, inputs.explanations
+    explanations = inputs.explanations
     if explanations.graph_sha256 != inputs.hashes["graph_sha256"]:
         raise ValueError("explanations were generated from a different Mapper graph file")
     if explanations.annotations_sha256 != inputs.hashes["annotations_sha256"]:
@@ -123,7 +154,7 @@ def _load_and_check(
     }
     if len(fingerprints) != 1:
         raise ValueError("graph, embeddings, explanations, and encoder use different models")
-    if not graph.item_ids == inputs.embeddings.item_ids == inputs.annotations.item_ids:
+    if not graph.item_ids == inputs.embeddings.item_ids == annotations.item_ids:
         raise ValueError("graph, embedding, and annotation item IDs must align in order")
     missing = [item_id for item_id in graph.item_ids if item_id not in inputs.manifest]
     if missing:
@@ -131,110 +162,113 @@ def _load_and_check(
     return inputs
 
 
-def _render(
-    inputs: _Inputs, config: PerturbationConfig, output_dir: Path
-) -> Tuple[List[Record], Dict[str, Path]]:
-    """Classify each member image and write its object, control, and identity PNGs.
+class _ImageWriter:
+    """Writes masked PNGs, plus one unmasked identity PNG per source image it touches."""
 
-    Returns one record per hypothesis and a map from variant ID to PNG path.
-    """
+    def __init__(self, root: Path, inputs: _Inputs, fill: Tuple[int, int, int]) -> None:
+        self._root, self._inputs, self._fill = root, inputs, fill
+        self._sources: Dict[str, np.ndarray] = {}
+        self.pngs: Dict[str, Path] = {}  # variant ID -> PNG, in write order
+        self.identities: Dict[str, str] = {}  # item ID -> variant ID of its unmasked PNG
 
-    annotations = inputs.annotations
-    known = {category.name for category in annotations.categories}
-    nodes = {node.id: node for node in inputs.graph.nodes}
-    fill = FILLS[config.fill]
-    style = f"{config.fill}-d{config.dilate_px}"
-    pngs: Dict[str, Path] = {}
-    sources: Dict[str, np.ndarray] = {}
-    hypotheses: List[Record] = []
+    def write(self, item_id: str, variants: Sequence[str], masks: Sequence[np.ndarray]) -> None:
+        rgb = self._source(item_id)
+        for variant, mask in zip(variants, masks):
+            perturbed = rgb.copy()
+            perturbed[mask] = self._fill
+            self._save(item_id, variant, perturbed)
 
-    def source(item_id: str) -> np.ndarray:
-        """Decode a member image once and write its unmasked identity PNG."""
-
-        if item_id not in sources:
-            image = annotations.images[annotations.item_ids.index(item_id)]
-            sources[item_id] = _load_rgb(inputs.manifest[item_id].image_path)
-            if sources[item_id].shape[:2] != (image.height, image.width):
+    def _source(self, item_id: str) -> np.ndarray:
+        if item_id not in self._sources:
+            image = self._inputs.images[item_id]
+            rgb = _load_rgb(self._inputs.manifest[item_id].image_path)
+            if rgb.shape[:2] != (image.height, image.width):
                 raise ValueError(f"image {item_id} does not match its annotations")
-            identity = f"{item_id}__identity"
-            pngs[identity] = output_dir / "images" / item_id / f"{identity}.png"
-            _write_png(pngs[identity], sources[item_id])
-        return sources[item_id]
+            self._sources[item_id] = rgb
+            self.identities[item_id] = f"{item_id}__identity"
+            self._save(item_id, self.identities[item_id], rgb)
+        return self._sources[item_id]
 
+    def _save(self, item_id: str, variant: str, rgb: np.ndarray) -> None:
+        self.pngs[variant] = self._root / item_id / f"{variant}.png"
+        _write_png(self.pngs[variant], rgb)
+
+
+def _render(inputs: _Inputs, config: PerturbationConfig, writer: _ImageWriter) -> List[_Pending]:
+    """Classify each hypothesis's member images and write PNGs for the testable ones."""
+
+    known = {category.name for category in inputs.annotations.categories}
+    style = f"{config.fill}-d{config.dilate_px}"
+    pending: List[_Pending] = []
     for explanation in inputs.explanations.explanations:
-        node = nodes[explanation.node_id]
+        node = inputs.nodes[explanation.node_id]
         for index, hypothesis in enumerate(explanation.hypotheses):
             identifier = hypothesis_id(node.id, index)
-            names = tuple(dict.fromkeys(hypothesis.coco_categories))
-            unknown = [name for name in names if name not in known]
-            slug = "+".join(sorted(name.replace(" ", "-") for name in names))
-            images: List[Record] = []
-            for item_id in node.item_ids if names and not unknown else ():
-                image = annotations.images[annotations.item_ids.index(item_id)]
-                box = clip_visible_box(image.width, image.height)
-                crop_pixels = (box[2] - box[0]) * (box[3] - box[1])
-                mask = category_mask(annotations, item_id, names, dilate_px=config.dilate_px)
-                record: Record = {"item_id": item_id, "status": "absent"}
-                images.append(record)
-                if mask is None:
-                    continue
-                record["visible_crop_fraction"] = visible_pixels(mask, box) / crop_pixels
-                if record["visible_crop_fraction"] < config.min_visible_fraction:
-                    record["status"] = "too_small_in_crop"
-                    continue
-                controls = control_masks(
-                    mask,
-                    box,
-                    count=config.controls,
-                    seed_key=f"{config.seed}|{item_id}|{slug}",
-                    max_overlap=config.max_control_overlap,
-                )
-                if len(controls) < config.controls:
-                    record["status"] = "no_control_room"
-                    continue
-                rgb = source(item_id)
-                stem = f"{item_id}__{identifier}__{slug}__{style}__"
-                variants = [f"{stem}object"] + [
-                    f"{stem}ctrl-s{config.seed}-{k:02d}" for k in range(config.controls)
-                ]
-                for variant, variant_mask in zip(variants, [mask, *controls]):
-                    perturbed = rgb.copy()
-                    perturbed[variant_mask] = fill
-                    pngs[variant] = output_dir / "images" / item_id / f"{variant}.png"
-                    _write_png(pngs[variant], perturbed)
-                record.update(status="testable", variants=variants)
-            hypotheses.append(
-                {
-                    "hypothesis_id": identifier,
-                    "node_id": node.id,
-                    "name": hypothesis.name,
-                    "coco_categories": list(names),
-                    "unknown_categories": unknown,
-                    "predicted_effect": hypothesis.predicted_effect,
-                    "positive_prompt": hypothesis.positive_prompt,
-                    "member_count": len(node.item_ids),
-                    "images": images,
-                }
+            categories = tuple(dict.fromkeys(hypothesis.coco_categories))
+            unknown = tuple(name for name in categories if name not in known)
+            slug = "+".join(sorted(name.replace(" ", "-") for name in categories))
+            images: List[ImageResult] = []
+            variants: Dict[str, Tuple[str, ...]] = {}
+            for item_id in node.item_ids if categories and not unknown else ():
+                image, masks = _classify(inputs, item_id, categories, slug, config)
+                images.append(image)
+                if masks:
+                    stem = f"{item_id}__{identifier}__{slug}__{style}__"
+                    controls = range(config.controls)
+                    variants[item_id] = (
+                        f"{stem}object",
+                        *(f"{stem}ctrl-s{config.seed}-{k:02d}" for k in controls),
+                    )
+                    writer.write(item_id, variants[item_id], masks)
+            pending.append(
+                _Pending(identifier, node, hypothesis, categories, unknown, tuple(images), variants)
             )
-    return hypotheses, pngs
+    return pending
+
+
+def _classify(
+    inputs: _Inputs,
+    item_id: str,
+    categories: Sequence[str],
+    slug: str,
+    config: PerturbationConfig,
+) -> Tuple[ImageResult, List[np.ndarray]]:
+    """Decide whether one member image can test the categories. Writes nothing.
+
+    Returns the image's status and, when it is testable, ``[object_mask, *control_masks]``.
+    """
+
+    image = inputs.images[item_id]
+    mask = category_mask(inputs.annotations, item_id, categories, dilate_px=config.dilate_px)
+    if mask is None:
+        return ImageResult(item_id, "absent"), []
+    box = clip_visible_box(image.width, image.height)
+    fraction = visible_pixels(mask, box) / ((box[2] - box[0]) * (box[3] - box[1]))
+    if fraction < config.min_visible_fraction:
+        return ImageResult(item_id, "too_small_in_crop", fraction), []
+    controls = control_masks(
+        mask,
+        box,
+        count=config.controls,
+        seed_key=f"{config.seed}|{item_id}|{slug}",
+        max_overlap=config.max_control_overlap,
+    )
+    if len(controls) < config.controls:
+        return ImageResult(item_id, "no_control_room", fraction), []
+    return ImageResult(item_id, "testable", fraction), [mask, *controls]
 
 
 def _embed(
     pngs: Mapping[str, Path],
-    hypotheses: List[Record],
-    inputs: _Inputs,
+    prompts: Mapping[str, str],
     encoder: ClipImageTextEncoder,
     cache: EmbeddingCache,
-    config: PerturbationConfig,
     batch_size: int,
-) -> Tuple[Dict[str, np.ndarray], Dict[str, np.ndarray], Optional[float]]:
-    """Embed every PNG and positive prompt, and check unmasked PNGs match the originals.
-
-    The content-addressed cache makes reruns free.
-    """
+) -> Tuple[Dict[str, np.ndarray], Dict[str, np.ndarray]]:
+    """Embed every PNG and positive prompt; the content-addressed cache makes reruns free."""
 
     if not pngs:
-        return {}, {}, None
+        return {}, {}
     images = embed_images(
         list(pngs.values()),
         encoder=encoder,
@@ -242,71 +276,107 @@ def _embed(
         item_ids=list(pngs),
         batch_size=batch_size,
     )
-    vectors = dict(zip(images.item_ids, images.normalized.astype(np.float64)))
     texts = embed_texts(
-        [hypothesis["positive_prompt"] for hypothesis in hypotheses],
-        encoder=encoder,
-        cache=cache,
-        item_ids=[hypothesis["hypothesis_id"] for hypothesis in hypotheses],
+        list(prompts.values()), encoder=encoder, cache=cache, item_ids=list(prompts)
     )
-    prompts = dict(zip(texts.item_ids, texts.normalized.astype(np.float64)))
-    originals = dict(
-        zip(inputs.embeddings.item_ids, inputs.embeddings.normalized.astype(np.float64))
+    return (
+        dict(zip(images.item_ids, images.normalized.astype(np.float64))),
+        dict(zip(texts.item_ids, texts.normalized.astype(np.float64))),
     )
+
+
+def _check_identity(
+    vectors: Mapping[str, np.ndarray],
+    identities: Mapping[str, str],
+    inputs: _Inputs,
+    config: PerturbationConfig,
+) -> Optional[float]:
+    """Check unmasked PNGs re-embed to the stored embeddings; return the lowest cosine."""
+
+    if not identities:
+        return None
+    rows = {item_id: row for row, item_id in enumerate(inputs.embeddings.item_ids)}
+    originals = inputs.embeddings.normalized.astype(np.float64)
     min_identity = min(
-        float(vectors[variant] @ originals[variant.split("__")[0]])
-        for variant in pngs
-        if variant.endswith("__identity")
+        float(vectors[variant] @ originals[rows[item_id]])
+        for item_id, variant in identities.items()
     )
     if min_identity < config.min_identity_cosine:
         raise ValueError(
             f"unmasked PNGs do not reproduce the stored embeddings "
             f"(min cosine {min_identity:.6f}); check images and model"
         )
-    return vectors, prompts, min_identity
+    return min_identity
 
 
 def _score(
-    hypotheses: List[Record],
+    pending: _Pending,
     vectors: Mapping[str, np.ndarray],
     prompts: Mapping[str, np.ndarray],
+    identities: Mapping[str, str],
     inputs: _Inputs,
     config: PerturbationConfig,
-) -> None:
-    """Score each testable image against its controls, then judge each hypothesis."""
+) -> HypothesisResult:
+    """Score each testable image against its controls, then judge the hypothesis."""
 
-    nodes = {node.id: node for node in inputs.graph.nodes}
-    for hypothesis in hypotheses:
-        node = nodes[hypothesis["node_id"]]
-        centroid = node_centroid(inputs.embeddings.normalized, node.member_indices)
+    images = pending.images
+    if pending.variants:
+        centroid = node_centroid(inputs.embeddings.normalized, pending.node.member_indices)
         centroid = centroid.astype(np.float64)
-        positive = prompts.get(hypothesis["hypothesis_id"])
-        for image in hypothesis["images"]:
-            if image["status"] != "testable":
-                continue
-            baseline = vectors[f"{image['item_id']}__identity"]
-            points = np.stack([vectors[variant] for variant in image.pop("variants")])
-            values = {
-                "centroid": np.linalg.norm(points - centroid, axis=1)
-                - np.linalg.norm(baseline - centroid),
-                "prompt": float(baseline @ positive) - points @ positive,
-            }
-            image["object"] = {name: float(value[0]) for name, value in values.items()}
-            image["controls"] = {
-                name: value[1:].round(8).tolist() for name, value in values.items()
-            }
-            image["p"] = {
-                name: (1 + int((value[1:] >= value[0]).sum())) / len(value)
-                for name, value in values.items()
-            }
-        hypothesis["verdict"] = decide(
-            hypothesis["coco_categories"],
-            hypothesis["unknown_categories"],
-            hypothesis["predicted_effect"],
-            hypothesis["member_count"],
-            hypothesis["images"],
-            config,
+        positive = prompts[pending.hypothesis_id]
+        images = tuple(
+            replace(
+                image,
+                score=_score_image(
+                    vectors[identities[image.item_id]],
+                    np.stack([vectors[variant] for variant in pending.variants[image.item_id]]),
+                    centroid,
+                    positive,
+                ),
+            )
+            if image.item_id in pending.variants
+            else image
+            for image in images
         )
+    hypothesis, member_count = pending.hypothesis, len(pending.node.item_ids)
+    return HypothesisResult(
+        hypothesis_id=pending.hypothesis_id,
+        node_id=pending.node.id,
+        name=hypothesis.name,
+        coco_categories=pending.categories,
+        unknown_categories=pending.unknown,
+        predicted_effect=hypothesis.predicted_effect,
+        positive_prompt=hypothesis.positive_prompt,
+        member_count=member_count,
+        images=images,
+        verdict=decide(
+            images,
+            categories=pending.categories,
+            unknown=pending.unknown,
+            predicted_effect=hypothesis.predicted_effect,
+            member_count=member_count,
+            config=config,
+        ),
+    )
+
+
+def _score_image(
+    baseline: np.ndarray, points: np.ndarray, centroid: np.ndarray, positive: np.ndarray
+) -> ImageScore:
+    """``points`` stacks the object variant then its controls; row 0 is the object."""
+
+    values = {
+        "centroid": np.linalg.norm(points - centroid, axis=1) - np.linalg.norm(baseline - centroid),
+        "prompt": float(baseline @ positive) - points @ positive,
+    }
+    return ImageScore(
+        object={name: float(values[name][0]) for name in STATISTICS},
+        controls={name: tuple(values[name][1:].round(8).tolist()) for name in STATISTICS},
+        p={
+            name: (1 + int((values[name][1:] >= values[name][0]).sum())) / len(values[name])
+            for name in STATISTICS
+        },
+    )
 
 
 def _load_rgb(path: Path) -> np.ndarray:
@@ -322,11 +392,4 @@ def _write_png(path: Path, rgb: np.ndarray) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     partial = path.with_name(f"{path.name}.part")
     Image.fromarray(rgb).save(partial, format="PNG")  # lossless and metadata-free
-    os.replace(partial, path)
-
-
-def _save_json(path: Path, data: Record) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    partial = path.with_name(f"{path.name}.part")
-    partial.write_text(json.dumps(data, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     os.replace(partial, path)
